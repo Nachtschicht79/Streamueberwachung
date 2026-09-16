@@ -1,0 +1,51 @@
+# Python
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Projektdaten (SQLite, Vorschaubilder)
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Logs und lokale Secrets
+*.log
+.env
+.env.*
+
+# macOS-Systemdateien
+.DS_Store
+.DS_Store?
+._*
+.AppleDouble
+.LSOverride
+.Spotlight-V100
+.Trashes
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+.fseventsd
+Icon?
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
