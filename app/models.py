@@ -26,7 +26,7 @@ class Settings(Base):
     telegram_chat_id: Mapped[str] = mapped_column(String(128), default="")
     brightness_threshold: Mapped[float] = mapped_column(Float, default=18.0)
     freeze_threshold: Mapped[float] = mapped_column(Float, default=2.5)
-    audio_rms_threshold: Mapped[float] = mapped_column(Float, default=0.008)
+    audio_rms_threshold: Mapped[float] = mapped_column(Float, default=-42.0)
     check_interval_seconds: Mapped[int] = mapped_column(Integer, default=10)
     cooldown_seconds: Mapped[int] = mapped_column(Integer, default=120)
     send_screenshot: Mapped[bool] = mapped_column(Boolean, default=True)

@@ -82,7 +82,7 @@ def analyze_video(
 
 
 def apply_silence(metrics: CheckMetrics, audio_rms: float | None, audio_threshold: float) -> None:
-    """Ergänzt Stille, falls ein gültiger Audio-RMS vorliegt."""
+    """Ergänzt Stille, falls ein gültiger Audiopegel in dBFS vorliegt."""
     metrics.audio_rms = audio_rms
     if audio_rms is not None and audio_rms < audio_threshold:
         metrics.issues.append(ALERT_SILENCE)
@@ -105,7 +105,7 @@ def summarize(metrics: CheckMetrics, audio_note: str | None = None) -> str:
     if metrics.frame_diff is not None:
         details.append(f"Frame-Diff {metrics.frame_diff:.2f}")
     if metrics.audio_rms is not None:
-        details.append(f"Audio-RMS {metrics.audio_rms:.4f}")
+        details.append(f"Audio {metrics.audio_rms:.1f} dBFS")
     elif audio_note:
         details.append(audio_note)
 

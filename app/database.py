@@ -55,6 +55,21 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
+def _linear_audio_to_dbfs(value: float | None, *, zero_to_floor: bool) -> float | None:
+    """Alte lineare RMS-Werte (0–1) nach dBFS wandeln; negative Werte bleiben."""
+    from monitor.stream import DBFS_FLOOR, rms_to_dbfs
+
+    if value is None:
+        return None
+    if value > 0:
+        return round(rms_to_dbfs(value) * 2) / 2
+    if value == 0 and zero_to_floor:
+        return DBFS_FLOOR
+    if zero_to_floor and value < 0:
+        return round(value * 2) / 2
+    return value
+
+
 def init_db() -> None:
     """Legt Tabellen an und schreibt Default-Zeilen, falls noch keine existieren."""
     from app.models import CheckStatus, Settings
@@ -64,10 +79,20 @@ def init_db() -> None:
 
     db = SessionLocal()
     try:
-        if db.query(Settings).first() is None:
+        settings = db.query(Settings).first()
+        if settings is None:
             db.add(Settings())
-        if db.query(CheckStatus).first() is None:
+        else:
+            converted = _linear_audio_to_dbfs(settings.audio_rms_threshold, zero_to_floor=True)
+            if converted is not None and converted != settings.audio_rms_threshold:
+                settings.audio_rms_threshold = converted
+        status = db.query(CheckStatus).first()
+        if status is None:
             db.add(CheckStatus())
+        else:
+            converted_rms = _linear_audio_to_dbfs(status.audio_rms, zero_to_floor=False)
+            if converted_rms != status.audio_rms:
+                status.audio_rms = converted_rms
         db.commit()
     finally:
         db.close()

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import shutil
 import subprocess
 from pathlib import Path
@@ -15,6 +16,14 @@ logger = logging.getLogger(__name__)
 FFMPEG_TIMEOUT_SECONDS = 18
 AUDIO_SECONDS = 1.5
 AUDIO_RATE = 16000
+DBFS_FLOOR = -100.0
+
+
+def rms_to_dbfs(rms: float) -> float:
+    """Wandelt linearen Full-Scale-RMS (0–1) in RMS-dBFS um."""
+    if rms <= 0:
+        return DBFS_FLOOR
+    return max(DBFS_FLOOR, 20.0 * math.log10(max(rms, 1e-10)))
 
 
 def ffmpeg_available() -> bool:
@@ -149,7 +158,7 @@ def measure_audio_rms(url: str) -> tuple[float | None, str | None]:
     """
     Kurzer PCM-Schnitt über ffmpeg.
 
-    Rückgabe: (RMS 0–1, Hinweis). Hinweis gesetzt, wenn Audio nicht messbar ist
+    Rückgabe: (RMS-dBFS, Hinweis). Hinweis gesetzt, wenn Audio nicht messbar ist
     (kein ffmpeg, kein Audiostream) – dann darf kein Stille-Alarm ausgelöst werden.
     """
     if not ffmpeg_available():
@@ -195,7 +204,7 @@ def measure_audio_rms(url: str) -> tuple[float | None, str | None]:
 
     normalized = samples.astype(np.float32) / 32768.0
     rms = float(np.sqrt(np.mean(np.square(normalized))))
-    return rms, None
+    return rms_to_dbfs(rms), None
 
 
 def save_preview(frame: np.ndarray, path: Path) -> bool:

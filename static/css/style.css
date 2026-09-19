@@ -54,29 +54,6 @@ body {
   padding: 16px 0;
 }
 
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.brand-icon {
-  display: flex;
-  width: 40px;
-  height: 40px;
-  flex: 0 0 40px;
-  align-items: center;
-  justify-content: center;
-  border-radius: 12px;
-  background: var(--accent-dim);
-  color: var(--accent);
-}
-
-.brand-icon svg {
-  width: 20px;
-  height: 20px;
-}
-
 .brand h1 {
   margin: 0;
   font-size: 1.05rem;

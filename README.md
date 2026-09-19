@@ -47,7 +47,7 @@ Ein Alarm wird erst nach zwei aufeinanderfolgenden Fehlprüfungen desselben Typs
 | --- | --- | --- |
 | Helligkeit | 18 | Mittelwert 0–255, darunter Schwarzbild |
 | Frame-Differenz | 2.5 | Kaum Bewegung zwischen Frames = Freeze |
-| Audio-RMS | 0.008 | Sehr leiser Pegel = Stille |
+| Audio (dBFS) | -42 | Sehr leiser RMS-Pegel = Stille |
 | Prüfintervall | 10 s | Abstand zwischen den Checks |
 | Cooldown | 120 s | Mindestabstand gleicher Alarme |
 
