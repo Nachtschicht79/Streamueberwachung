@@ -43,14 +43,17 @@
           <label>
             <span class="label">Helligkeitsschwelle (Schwarzbild)</span>
             <input name="brightness_threshold" type="number" min="0" max="255" step="0.5">
+            <span class="hint">Mittelwert 0–255. Darunter gilt das Bild als schwarz.</span>
           </label>
           <label>
             <span class="label">Frame-Differenz (Freeze)</span>
             <input name="freeze_threshold" type="number" min="0" step="0.01">
+            <span class="hint">Mittlere Pixeländerung. Darunter gilt das Bild als eingefroren.</span>
           </label>
           <label>
             <span class="label">Audio (dBFS, Stille)</span>
             <input name="audio_rms_threshold" type="number" min="-100" max="0" step="0.5">
+            <span class="hint">Lautstärkepegel. Darunter gilt der Ton als still.</span>
           </label>
           <label>
             <span class="label">Prüfintervall (Sekunden)</span>
@@ -84,7 +87,7 @@
             <dd id="status-running">Gestoppt</dd>
           </div>
           <div class="status-row">
-            <dt>Letzte Prüfung</dt>
+            <dt>Letzte Prüfung (Ortszeit)</dt>
             <dd id="status-time">–</dd>
           </div>
           <dt class="label">Ergebnis</dt>
@@ -104,6 +107,11 @@
             <strong id="metric-audio">–</strong>
           </div>
         </div>
+        <p class="hint metrics-hint">
+          Helligkeit ist der Mittelwert 0–255 (niedrig = Schwarzbild).
+          Frame-Diff ist die mittlere Pixeländerung zum vorherigen Frame (sehr niedrig = eingefrorenes Bild).
+          Audio dBFS ist der Lautstärkepegel (niedriger = Stille).
+        </p>
       </section>
 
       <section class="card">
@@ -127,7 +135,7 @@
         <table>
           <thead>
             <tr>
-              <th>Zeit</th>
+              <th>Zeit (Ortszeit)</th>
               <th>Typ</th>
               <th>Meldung</th>
               <th class="actions-col"> </th>
@@ -215,7 +223,9 @@
 
     function formatTime(value) {
       if (!value) return "–";
-      const date = new Date(value);
+      const raw = String(value);
+      const hasZone = /Z$|[+-]\d{2}:?\d{2}$/.test(raw);
+      const date = new Date(hasZone ? raw : raw + "Z");
       if (Number.isNaN(date.getTime())) return "–";
       return date.toLocaleString("de-DE");
     }

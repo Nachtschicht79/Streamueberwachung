@@ -2,9 +2,18 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+
+def ensure_utc(value: datetime | None) -> datetime | None:
+    """SQLite liefert Zeiten oft ohne tzinfo; gespeichert wird UTC."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
 
 
 class SettingsUpdate(BaseModel):
@@ -50,6 +59,11 @@ class StatusOut(BaseModel):
     audio_rms: float | None
     has_preview: bool
 
+    @field_validator("last_check_at", mode="before")
+    @classmethod
+    def last_check_utc(cls, value: datetime | None) -> datetime | None:
+        return ensure_utc(value)
+
 
 class AlertOut(BaseModel):
     id: int
@@ -58,6 +72,11 @@ class AlertOut(BaseModel):
     message: str
 
     model_config = {"from_attributes": True}
+
+    @field_validator("created_at", mode="before")
+    @classmethod
+    def created_at_utc(cls, value: datetime) -> datetime:
+        return ensure_utc(value) or value.replace(tzinfo=timezone.utc)
 
 
 class SimpleOk(BaseModel):
