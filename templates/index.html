@@ -19,6 +19,12 @@
           <span class="dot"></span>
           Gestoppt
         </div>
+        <button type="button" id="btn-open-live" class="btn btn-ghost" aria-expanded="false" aria-controls="live-modal">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+          </svg>
+          Livestream
+        </button>
         <button type="button" id="btn-open-settings" class="btn btn-ghost" aria-expanded="false" aria-controls="settings-drawer">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
@@ -52,8 +58,12 @@
           <dd id="status-running">Gestoppt</dd>
         </div>
         <div class="status-row">
-          <dt>Stream</dt>
+          <dt>Master</dt>
           <dd id="status-stream" class="status-url" title="">–</dd>
+        </div>
+        <div class="status-row">
+          <dt>Backup</dt>
+          <dd id="status-backup" class="status-url" title="">–</dd>
         </div>
         <div class="status-row">
           <dt>Letzte Prüfung (Ortszeit)</dt>
@@ -123,6 +133,160 @@
     </section>
   </main>
 
+  <div id="live-backdrop" class="live-backdrop" hidden></div>
+  <div id="live-modal" class="live-modal" role="dialog" aria-modal="true" aria-labelledby="live-title" aria-hidden="true" inert>
+    <div class="live-dialog">
+      <div class="live-head">
+        <h2 id="live-title">Livestream</h2>
+        <button type="button" id="btn-close-live" class="btn-icon btn-close" title="Livestream schließen" aria-label="Livestream schließen">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <div class="live-grid">
+        <article class="live-pane" data-stream="master">
+          <div class="live-video-wrap" data-player-wrap>
+            <div class="live-video-bar">
+              <h3>Master</h3>
+              <button type="button" class="btn btn-ghost live-mute" data-mute>Ton an</button>
+            </div>
+            <video playsinline muted></video>
+            <div class="live-empty" data-empty>Keine Master-URL hinterlegt</div>
+          </div>
+          <section class="live-block">
+            <h4>Manifest</h4>
+            <div class="live-status-row">
+              <span class="live-status" data-manifest-status>
+                <span class="dot"></span>
+                <strong data-manifest-state>–</strong>
+              </span>
+              <span class="live-pill" data-manifest-live hidden>Live</span>
+              <span class="live-pill" data-manifest-kind hidden></span>
+            </div>
+            <div class="live-metrics">
+              <div>
+                <span>Latenz</span>
+                <strong data-manifest-latency>–</strong>
+              </div>
+              <div>
+                <span>Segmente</span>
+                <strong data-manifest-segments>–</strong>
+              </div>
+              <div>
+                <span>Zieldauer</span>
+                <strong data-manifest-target>–</strong>
+              </div>
+            </div>
+            <p class="live-details" data-manifest-details></p>
+          </section>
+          <section class="live-block">
+            <h4>Player</h4>
+            <div class="live-status-row">
+              <span class="live-status" data-player-status>
+                <span class="dot"></span>
+                <strong data-player-state>–</strong>
+              </span>
+              <span class="live-pill" data-player-engine hidden></span>
+            </div>
+            <div class="live-metrics">
+              <div>
+                <span>Auflösung</span>
+                <strong data-player-resolution>–</strong>
+              </div>
+              <div>
+                <span>Bandwidth</span>
+                <strong data-player-bandwidth>–</strong>
+              </div>
+              <div>
+                <span>Live-Latenz</span>
+                <strong data-player-live-latency>–</strong>
+              </div>
+              <div>
+                <span>Buffer-Stalls</span>
+                <strong data-player-stalls>–</strong>
+              </div>
+              <div>
+                <span>Fragmente</span>
+                <strong data-player-fragments>–</strong>
+              </div>
+            </div>
+            <p class="live-details" data-player-hint hidden>Eingeschränkte Metriken (Native HLS)</p>
+          </section>
+        </article>
+        <article class="live-pane" data-stream="backup">
+          <div class="live-video-wrap" data-player-wrap>
+            <div class="live-video-bar">
+              <h3>Backup</h3>
+              <button type="button" class="btn btn-ghost live-mute" data-mute>Ton an</button>
+            </div>
+            <video playsinline muted></video>
+            <div class="live-empty" data-empty>Keine Backup-URL hinterlegt</div>
+          </div>
+          <section class="live-block">
+            <h4>Manifest</h4>
+            <div class="live-status-row">
+              <span class="live-status" data-manifest-status>
+                <span class="dot"></span>
+                <strong data-manifest-state>–</strong>
+              </span>
+              <span class="live-pill" data-manifest-live hidden>Live</span>
+              <span class="live-pill" data-manifest-kind hidden></span>
+            </div>
+            <div class="live-metrics">
+              <div>
+                <span>Latenz</span>
+                <strong data-manifest-latency>–</strong>
+              </div>
+              <div>
+                <span>Segmente</span>
+                <strong data-manifest-segments>–</strong>
+              </div>
+              <div>
+                <span>Zieldauer</span>
+                <strong data-manifest-target>–</strong>
+              </div>
+            </div>
+            <p class="live-details" data-manifest-details></p>
+          </section>
+          <section class="live-block">
+            <h4>Player</h4>
+            <div class="live-status-row">
+              <span class="live-status" data-player-status>
+                <span class="dot"></span>
+                <strong data-player-state>–</strong>
+              </span>
+              <span class="live-pill" data-player-engine hidden></span>
+            </div>
+            <div class="live-metrics">
+              <div>
+                <span>Auflösung</span>
+                <strong data-player-resolution>–</strong>
+              </div>
+              <div>
+                <span>Bandwidth</span>
+                <strong data-player-bandwidth>–</strong>
+              </div>
+              <div>
+                <span>Live-Latenz</span>
+                <strong data-player-live-latency>–</strong>
+              </div>
+              <div>
+                <span>Buffer-Stalls</span>
+                <strong data-player-stalls>–</strong>
+              </div>
+              <div>
+                <span>Fragmente</span>
+                <strong data-player-fragments>–</strong>
+              </div>
+            </div>
+            <p class="live-details" data-player-hint hidden>Eingeschränkte Metriken (Native HLS)</p>
+          </section>
+        </article>
+      </div>
+    </div>
+  </div>
+
   <div id="settings-backdrop" class="drawer-backdrop" hidden></div>
   <aside id="settings-drawer" class="drawer" role="dialog" aria-modal="true" aria-labelledby="settings-title" aria-hidden="true" inert>
     <div class="drawer-head">
@@ -136,8 +300,12 @@
     <form id="settings-form">
       <div id="settings-fields" class="drawer-fields">
         <label>
-          <span class="label">Stream-URL</span>
+          <span class="label">Master-Stream-URL</span>
           <input name="stream_url" type="text" placeholder="https://example.com/live/stream.m3u8">
+        </label>
+        <label>
+          <span class="label">Backup-Stream-URL</span>
+          <input name="backup_stream_url" type="text" placeholder="https://example.com/live/backup.m3u8">
         </label>
         <label>
           <span class="label">Telegram Bot-Token</span>
@@ -186,6 +354,8 @@
   </aside>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.20/dist/hls.min.js"></script>
+  <script src="/static/js/live-player.js"></script>
   <script>
     const ALERT_LABELS = {
       black: "Schwarzbild",
@@ -198,6 +368,7 @@
     const feedback = document.getElementById("form-feedback");
     const settingsDrawer = document.getElementById("settings-drawer");
     const settingsBackdrop = document.getElementById("settings-backdrop");
+    const btnOpenLive = document.getElementById("btn-open-live");
     const btnOpenSettings = document.getElementById("btn-open-settings");
     const btnCloseSettings = document.getElementById("btn-close-settings");
     const btnStart = document.getElementById("btn-start");
@@ -231,6 +402,7 @@
       const data = new FormData(form);
       return {
         stream_url: data.get("stream_url") || "",
+        backup_stream_url: data.get("backup_stream_url") || "",
         telegram_bot_token: data.get("telegram_bot_token") || "",
         telegram_chat_id: data.get("telegram_chat_id") || "",
         brightness_threshold: toNumber(data.get("brightness_threshold")),
@@ -242,15 +414,20 @@
       };
     }
 
-    function setStreamUrl(url) {
-      const el = document.getElementById("status-stream");
-      const value = String(url || "").trim();
-      el.textContent = value || "–";
-      el.title = value;
+    function setStreamUrls(master, backup) {
+      const masterEl = document.getElementById("status-stream");
+      const backupEl = document.getElementById("status-backup");
+      const masterValue = String(master || "").trim();
+      const backupValue = String(backup || "").trim();
+      masterEl.textContent = masterValue || "–";
+      masterEl.title = masterValue;
+      backupEl.textContent = backupValue || "–";
+      backupEl.title = backupValue;
     }
 
     function fillSettings(s) {
       form.elements.stream_url.value = s.stream_url || "";
+      form.elements.backup_stream_url.value = s.backup_stream_url || "";
       form.elements.telegram_bot_token.value = s.telegram_bot_token || "";
       form.elements.telegram_chat_id.value = s.telegram_chat_id || "";
       form.elements.brightness_threshold.value = s.brightness_threshold;
@@ -260,7 +437,7 @@
       form.elements.cooldown_seconds.value = s.cooldown_seconds;
       form.elements.send_screenshot.checked = !!s.send_screenshot;
       lastSettings = s;
-      setStreamUrl(s.stream_url);
+      setStreamUrls(s.stream_url, s.backup_stream_url);
       setRunning(s.monitoring_enabled);
       renderChart();
     }
@@ -377,8 +554,11 @@
           body: JSON.stringify(formPayload())
         });
         lastSettings = saved;
-        setStreamUrl(saved.stream_url);
+        setStreamUrls(saved.stream_url, saved.backup_stream_url);
         renderChart();
+        if (window.LiveStreams && window.LiveStreams.isOpen()) {
+          window.LiveStreams.open(saved);
+        }
         setFeedback("Einstellungen gespeichert.", true);
       } catch (err) {
         setFeedback(err.message, false);
@@ -410,7 +590,7 @@
           body: JSON.stringify(formPayload())
         });
         lastSettings = saved;
-        setStreamUrl(saved.stream_url);
+        setStreamUrls(saved.stream_url, saved.backup_stream_url);
         renderChart();
         const result = await api("/api/monitor/start", { method: "POST" });
         setRunning(true);
@@ -654,7 +834,16 @@
       }
     }
 
+    btnOpenLive.addEventListener("click", function () {
+      setSettingsOpen(false, { restoreFocus: false });
+      if (window.LiveStreams) {
+        window.LiveStreams.open(lastSettings || {});
+      }
+    });
     btnOpenSettings.addEventListener("click", function () {
+      if (window.LiveStreams && window.LiveStreams.isOpen()) {
+        window.LiveStreams.close();
+      }
       setSettingsOpen(true);
     });
     btnCloseSettings.addEventListener("click", function () {
@@ -664,7 +853,12 @@
       setSettingsOpen(false);
     });
     document.addEventListener("keydown", function (event) {
-      if (event.key === "Escape" && settingsDrawer.classList.contains("is-open")) {
+      if (event.key !== "Escape") return;
+      if (window.LiveStreams && window.LiveStreams.isOpen()) {
+        window.LiveStreams.close();
+        return;
+      }
+      if (settingsDrawer.classList.contains("is-open")) {
         setSettingsOpen(false);
       }
     });

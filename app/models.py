@@ -22,6 +22,7 @@ class Settings(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     stream_url: Mapped[str] = mapped_column(String(2048), default="")
+    backup_stream_url: Mapped[str] = mapped_column(String(2048), default="")
     telegram_bot_token: Mapped[str] = mapped_column(String(256), default="")
     telegram_chat_id: Mapped[str] = mapped_column(String(128), default="")
     brightness_threshold: Mapped[float] = mapped_column(Float, default=18.0)

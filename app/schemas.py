@@ -20,6 +20,7 @@ class SettingsUpdate(BaseModel):
     """Vom Dashboard gespeicherte Einstellungen (ohne Start/Stop-Flag)."""
 
     stream_url: str = ""
+    backup_stream_url: str = ""
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
     brightness_threshold: float = Field(default=18.0, ge=0, le=255)

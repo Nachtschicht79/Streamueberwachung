@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Generator
 from pathlib import Path
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -70,12 +70,31 @@ def _linear_audio_to_dbfs(value: float | None, *, zero_to_floor: bool) -> float 
     return value
 
 
+def _ensure_settings_columns() -> None:
+    """Ergänzt neue Settings-Spalten in bestehenden SQLite-Dateien."""
+    inspector = inspect(engine)
+    if "settings" not in inspector.get_table_names():
+        return
+    existing = {column["name"] for column in inspector.get_columns("settings")}
+    statements: list[str] = []
+    if "backup_stream_url" not in existing:
+        statements.append(
+            "ALTER TABLE settings ADD COLUMN backup_stream_url VARCHAR(2048) DEFAULT ''"
+        )
+    if not statements:
+        return
+    with engine.begin() as connection:
+        for statement in statements:
+            connection.execute(text(statement))
+
+
 def init_db() -> None:
     """Legt Tabellen an und schreibt Default-Zeilen, falls noch keine existieren."""
     from app.models import CheckStatus, MetricSample, Settings  # noqa: F401
 
     _ensure_data_dir()
     Base.metadata.create_all(bind=engine)
+    _ensure_settings_columns()
 
     db = SessionLocal()
     try:

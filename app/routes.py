@@ -7,11 +7,12 @@ from pathlib import Path
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.database import BASE_DIR, PREVIEW_PATH, get_db
+from app.hls_proxy import proxy_hls
 from app.models import Alert, CheckStatus, MetricSample, Settings
 from app.schemas import (
     AlertOut,
@@ -52,6 +53,7 @@ def _status_row(db: Session) -> CheckStatus:
 def _to_settings_out(row: Settings) -> SettingsOut:
     return SettingsOut(
         stream_url=row.stream_url,
+        backup_stream_url=getattr(row, "backup_stream_url", "") or "",
         telegram_bot_token=row.telegram_bot_token,
         telegram_chat_id=row.telegram_chat_id,
         brightness_threshold=row.brightness_threshold,
@@ -78,6 +80,7 @@ def get_settings(db: Session = Depends(get_db)) -> SettingsOut:
 def save_settings(payload: SettingsUpdate, db: Session = Depends(get_db)) -> SettingsOut:
     row = _settings_row(db)
     row.stream_url = payload.stream_url.strip()
+    row.backup_stream_url = payload.backup_stream_url.strip()
     row.telegram_bot_token = payload.telegram_bot_token.strip()
     row.telegram_chat_id = payload.telegram_chat_id.strip()
     row.brightness_threshold = payload.brightness_threshold
@@ -95,7 +98,7 @@ def save_settings(payload: SettingsUpdate, db: Session = Depends(get_db)) -> Set
 def start_monitor(db: Session = Depends(get_db)) -> SimpleOk:
     row = _settings_row(db)
     if not (row.stream_url or "").strip():
-        raise HTTPException(status_code=400, detail="Bitte zuerst eine Stream-URL speichern.")
+        raise HTTPException(status_code=400, detail="Bitte zuerst eine Master-Stream-URL speichern.")
     row.monitoring_enabled = True
     db.commit()
     return SimpleOk(ok=True, message="Überwachung gestartet.")
@@ -179,6 +182,17 @@ def delete_all_alerts(db: Session = Depends(get_db)) -> SimpleOk:
     if deleted:
         return SimpleOk(ok=True, message="Alarmhistorie gelöscht.")
     return SimpleOk(ok=True, message="Keine Alarme vorhanden.")
+
+
+@router.get("/api/hls/proxy")
+@router.get("/api/hls/proxy/{name}")
+def hls_proxy(
+    url: str = Query(default=""),
+    name: str | None = None,
+    db: Session = Depends(get_db),
+) -> Response:
+    _ = name
+    return proxy_hls(url, _settings_row(db))
 
 
 @router.get("/preview.jpg")
