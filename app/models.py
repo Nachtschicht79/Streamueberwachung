@@ -1,10 +1,10 @@
-"""SQLAlchemy-Modelle für Einstellungen, Status und Alarmhistorie."""
+"""SQLAlchemy-Modelle für Einstellungen, Status, Messwerte und Alarmhistorie."""
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Float, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -42,6 +42,19 @@ class Alert(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     alert_type: Mapped[str] = mapped_column(String(32))
     message: Mapped[str] = mapped_column(Text, default="")
+
+
+class MetricSample(Base):
+    """Ein Messpunkt aus einem Prüfzyklus (Helligkeit, Frame-Diff, Audio)."""
+
+    __tablename__ = "metric_samples"
+    __table_args__ = (Index("ix_metric_samples_recorded_at", "recorded_at"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    brightness: Mapped[float | None] = mapped_column(Float, nullable=True)
+    frame_diff: Mapped[float | None] = mapped_column(Float, nullable=True)
+    audio_rms: Mapped[float | None] = mapped_column(Float, nullable=True)
 
 
 class CheckStatus(Base):

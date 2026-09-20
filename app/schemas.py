@@ -65,6 +65,20 @@ class StatusOut(BaseModel):
         return ensure_utc(value)
 
 
+class MetricSampleOut(BaseModel):
+    recorded_at: datetime
+    brightness: float | None
+    frame_diff: float | None
+    audio_rms: float | None
+
+    model_config = {"from_attributes": True}
+
+    @field_validator("recorded_at", mode="before")
+    @classmethod
+    def recorded_at_utc(cls, value: datetime) -> datetime:
+        return ensure_utc(value) or value.replace(tzinfo=timezone.utc)
+
+
 class AlertOut(BaseModel):
     id: int
     created_at: datetime

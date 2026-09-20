@@ -72,7 +72,7 @@ def _linear_audio_to_dbfs(value: float | None, *, zero_to_floor: bool) -> float 
 
 def init_db() -> None:
     """Legt Tabellen an und schreibt Default-Zeilen, falls noch keine existieren."""
-    from app.models import CheckStatus, Settings
+    from app.models import CheckStatus, MetricSample, Settings  # noqa: F401
 
     _ensure_data_dir()
     Base.metadata.create_all(bind=engine)

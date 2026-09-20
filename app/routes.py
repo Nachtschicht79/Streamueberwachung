@@ -4,15 +4,18 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from datetime import datetime, timedelta, timezone
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.database import BASE_DIR, PREVIEW_PATH, get_db
-from app.models import Alert, CheckStatus, Settings
+from app.models import Alert, CheckStatus, MetricSample, Settings
 from app.schemas import (
     AlertOut,
+    MetricSampleOut,
     SettingsOut,
     SettingsUpdate,
     SimpleOk,
@@ -132,6 +135,20 @@ def get_status(db: Session = Depends(get_db)) -> StatusOut:
         frame_diff=status.frame_diff,
         audio_rms=status.audio_rms,
         has_preview=status.has_preview and PREVIEW_PATH.is_file(),
+    )
+
+
+@router.get("/api/metrics", response_model=list[MetricSampleOut])
+def list_metrics(
+    minutes: int = Query(default=120, ge=15, le=360),
+    db: Session = Depends(get_db),
+) -> list[MetricSample]:
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=minutes)
+    return (
+        db.query(MetricSample)
+        .filter(MetricSample.recorded_at >= cutoff)
+        .order_by(MetricSample.recorded_at.asc(), MetricSample.id.asc())
+        .all()
     )
 
 

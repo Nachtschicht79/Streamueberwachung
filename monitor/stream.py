@@ -6,6 +6,8 @@ import logging
 import math
 import shutil
 import subprocess
+import threading
+import time
 from pathlib import Path
 
 import cv2
@@ -17,6 +19,9 @@ FFMPEG_TIMEOUT_SECONDS = 18
 AUDIO_SECONDS = 1.5
 AUDIO_RATE = 16000
 DBFS_FLOOR = -100.0
+# Frames älter als das gelten als unbrauchbar (HLS-Segmente können einige Sekunden klaffen).
+READER_FRAME_MAX_AGE_SECONDS = 8.0
+READER_FRAME_WAIT_SECONDS = 12.0
 
 
 def rms_to_dbfs(rms: float) -> float:
@@ -32,11 +37,17 @@ def ffmpeg_available() -> bool:
 
 
 class StreamCapture:
-    """Hält eine OpenCV-Capture offen und fällt bei Fehlern auf ffmpeg zurück."""
+    """Hält eine OpenCV-Capture offen, liest Frames durchgehend und fällt auf ffmpeg zurück."""
 
     def __init__(self) -> None:
+        self._lock = threading.Lock()
         self._cap: cv2.VideoCapture | None = None
         self._url: str = ""
+        self._latest: np.ndarray | None = None
+        self._latest_at: float = 0.0
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._generation: int = 0
 
     def get_frame(self, url: str) -> np.ndarray | None:
         """Liefert den aktuellsten Frame oder None bei Ausfall."""
@@ -44,10 +55,10 @@ class StreamCapture:
         if not url:
             return None
 
-        if self._cap is None or self._url != url:
+        if self._url != url or not self._reader_alive():
             self._open(url)
 
-        frame = self._read_opencv()
+        frame = self._wait_for_fresh_frame(READER_FRAME_WAIT_SECONDS)
         if frame is not None:
             return frame
 
@@ -59,52 +70,113 @@ class StreamCapture:
             return frame
 
         self._open(url)
-        return self._read_opencv()
+        return self._wait_for_fresh_frame(READER_FRAME_WAIT_SECONDS)
 
     def release(self) -> None:
-        """Schließt die Capture, damit ein Reconnect sauber neu öffnet."""
-        if self._cap is not None:
+        """Stoppt den Lesethread und schließt die Capture."""
+        thread = self._thread
+        self._thread = None
+        with self._lock:
+            self._generation += 1
+            self._stop.set()
+            cap = self._cap
+            self._cap = None
+            self._latest = None
+            self._latest_at = 0.0
+            self._url = ""
+        if cap is not None:
             try:
-                self._cap.release()
+                cap.release()
             except cv2.error:
                 pass
-            self._cap = None
-        self._url = ""
+        if thread is not None and thread is not threading.current_thread():
+            thread.join(timeout=2.0)
 
     def _open(self, url: str) -> None:
         self.release()
+        self._stop.clear()
+        with self._lock:
+            generation = self._generation
         cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
         if hasattr(cv2, "CAP_PROP_OPEN_TIMEOUT_MSEC"):
             cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 12000)
         if hasattr(cv2, "CAP_PROP_READ_TIMEOUT_MSEC"):
             cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, 12000)
+        if hasattr(cv2, "CAP_PROP_BUFFERSIZE"):
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         if not cap.isOpened():
             cap.release()
             logger.warning("OpenCV konnte den Stream nicht öffnen.")
             return
-        self._cap = cap
-        self._url = url
+        with self._lock:
+            self._cap = cap
+            self._url = url
+            self._latest = None
+            self._latest_at = 0.0
+        self._thread = threading.Thread(
+            target=self._reader_loop,
+            args=(generation,),
+            name="stream-reader",
+            daemon=True,
+        )
+        self._thread.start()
 
-    def _read_opencv(self) -> np.ndarray | None:
-        if self._cap is None or not self._cap.isOpened():
-            return None
+    def _reader_alive(self) -> bool:
+        return self._thread is not None and self._thread.is_alive()
 
-        # Puffer leeren, damit bei HLS eher ein aktuelles Segment ankommt.
-        grabbed = False
-        for _ in range(6):
-            grabbed = bool(self._cap.grab())
-            if not grabbed:
+    def _reader_loop(self, generation: int) -> None:
+        """Liest in Echtzeit, damit der ffmpeg-Puffer nicht volläuft."""
+        failures = 0
+        while not self._stop.is_set() and generation == self._generation:
+            with self._lock:
+                if generation != self._generation:
+                    break
+                cap = self._cap
+            if cap is None:
                 break
+            try:
+                ok, frame = cap.read()
+            except cv2.error:
+                ok, frame = False, None
+            if generation != self._generation or self._stop.is_set():
+                break
+            if ok and frame is not None and frame.size > 0:
+                copied = frame.copy()
+                with self._lock:
+                    if generation != self._generation:
+                        break
+                    self._latest = copied
+                    self._latest_at = time.monotonic()
+                failures = 0
+                continue
+            failures += 1
+            time.sleep(0.05 if failures < 8 else 0.25)
 
-        if not grabbed:
-            self.release()
-            return None
+    def _snapshot_fresh(self) -> np.ndarray | None:
+        with self._lock:
+            frame = self._latest
+            grabbed_at = self._latest_at
+            if frame is None or frame.size == 0:
+                return None
+            age = time.monotonic() - grabbed_at
+            if age > READER_FRAME_MAX_AGE_SECONDS:
+                return None
+            return frame.copy()
 
-        ok, frame = self._cap.retrieve()
-        if not ok or frame is None or frame.size == 0:
-            self.release()
-            return None
-        return frame
+    def _wait_for_fresh_frame(self, timeout: float) -> np.ndarray | None:
+        deadline = time.monotonic() + max(0.0, timeout)
+        while True:
+            frame = self._snapshot_fresh()
+            if frame is not None:
+                return frame
+            if time.monotonic() >= deadline:
+                return None
+            if not self._reader_alive():
+                return None
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return None
+            time.sleep(min(0.05, remaining))
 
 
 def grab_frame_ffmpeg(url: str) -> np.ndarray | None:

@@ -14,117 +14,89 @@
         <h1>Streamüberwachung</h1>
         <p>Lokale Kontrolle für HLS, HTTP und RTMP</p>
       </div>
-      <div id="run-badge" class="badge">
-        <span class="dot"></span>
-        Gestoppt
+      <div class="topbar-actions">
+        <div id="run-badge" class="badge">
+          <span class="dot"></span>
+          Gestoppt
+        </div>
+        <button type="button" id="btn-open-settings" class="btn btn-ghost" aria-expanded="false" aria-controls="settings-drawer">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+          </svg>
+          Einstellungen
+        </button>
+        <button type="button" id="btn-start" class="btn btn-accent">Überwachung starten</button>
+        <button type="button" id="btn-stop" class="btn btn-danger hidden">Überwachung stoppen</button>
       </div>
     </div>
   </header>
 
   <main class="wrap layout">
     <section class="card">
-      <h2>Einstellungen</h2>
-      <form id="settings-form">
-        <label>
-          <span class="label">Stream-URL</span>
-          <input name="stream_url" type="text" placeholder="https://example.com/live/stream.m3u8">
-        </label>
-        <div class="grid-2" style="margin-top:16px">
-          <label>
-            <span class="label">Telegram Bot-Token</span>
-            <input name="telegram_bot_token" type="password" autocomplete="off">
-          </label>
-          <label>
-            <span class="label">Telegram Chat-ID</span>
-            <input name="telegram_chat_id" type="text">
-          </label>
-        </div>
-        <div class="grid-2" style="margin-top:16px">
-          <label>
-            <span class="label">Helligkeitsschwelle (Schwarzbild)</span>
-            <input name="brightness_threshold" type="number" min="0" max="255" step="0.5">
-            <span class="hint">Mittelwert 0–255. Darunter gilt das Bild als schwarz.</span>
-          </label>
-          <label>
-            <span class="label">Frame-Differenz (Freeze)</span>
-            <input name="freeze_threshold" type="number" min="0" step="0.01">
-            <span class="hint">Mittlere Pixeländerung. Darunter gilt das Bild als eingefroren.</span>
-          </label>
-          <label>
-            <span class="label">Audio (dBFS, Stille)</span>
-            <input name="audio_rms_threshold" type="number" min="-100" max="0" step="0.5">
-            <span class="hint">Lautstärkepegel. Darunter gilt der Ton als still.</span>
-          </label>
-          <label>
-            <span class="label">Prüfintervall (Sekunden)</span>
-            <input name="check_interval_seconds" type="number" min="3" max="600" step="1">
-          </label>
-          <label>
-            <span class="label">Cooldown nach Alarm (Sekunden)</span>
-            <input name="cooldown_seconds" type="number" min="0" max="86400" step="1">
-          </label>
-          <label class="check">
-            <input name="send_screenshot" type="checkbox">
-            Screenshot an Telegram senden
-          </label>
-        </div>
-        <p id="form-feedback" class="feedback"></p>
-        <div class="actions">
-          <button type="submit" class="btn btn-primary">Speichern</button>
-          <button type="button" id="btn-telegram" class="btn btn-ghost">Telegram testen</button>
-          <button type="button" id="btn-start" class="btn btn-accent">Überwachung starten</button>
-          <button type="button" id="btn-stop" class="btn btn-danger hidden">Überwachung stoppen</button>
-        </div>
-      </form>
+      <div class="preview-head">
+        <h2>Vorschau</h2>
+        <span id="preview-label" class="preview-label">Kein Bild</span>
+      </div>
+      <div class="preview-frame">
+        <img id="preview-image" alt="Aktuelles Stream-Bild" class="hidden">
+        <div id="preview-empty" class="preview-empty">Noch kein Frame empfangen</div>
+      </div>
     </section>
 
-    <div class="stack">
-      <section class="card">
-        <h2>Status</h2>
-        <dl>
-          <div class="status-row">
-            <dt>Überwachung</dt>
-            <dd id="status-running">Gestoppt</dd>
-          </div>
-          <div class="status-row">
-            <dt>Letzte Prüfung (Ortszeit)</dt>
-            <dd id="status-time">–</dd>
-          </div>
-          <dt class="label">Ergebnis</dt>
-          <dd id="status-message" class="status-box">Noch keine Prüfung.</dd>
-        </dl>
-        <div class="metrics">
-          <div class="metric">
-            <span>Helligkeit</span>
-            <strong id="metric-brightness">–</strong>
-          </div>
-          <div class="metric">
-            <span>Frame-Diff</span>
-            <strong id="metric-diff">–</strong>
-          </div>
-          <div class="metric">
-            <span>Audio dBFS</span>
-            <strong id="metric-audio">–</strong>
-          </div>
+    <section class="card">
+      <h2>Status</h2>
+      <dl>
+        <div class="status-row">
+          <dt>Überwachung</dt>
+          <dd id="status-running">Gestoppt</dd>
         </div>
-        <p class="hint metrics-hint">
-          Helligkeit ist der Mittelwert 0–255 (niedrig = Schwarzbild).
-          Frame-Diff ist die mittlere Pixeländerung zum vorherigen Frame (sehr niedrig = eingefrorenes Bild).
-          Audio dBFS ist der Lautstärkepegel (niedriger = Stille).
-        </p>
-      </section>
+        <div class="status-row">
+          <dt>Stream</dt>
+          <dd id="status-stream" class="status-url" title="">–</dd>
+        </div>
+        <div class="status-row">
+          <dt>Letzte Prüfung (Ortszeit)</dt>
+          <dd id="status-time">–</dd>
+        </div>
+        <dt class="label">Ergebnis</dt>
+        <dd id="status-message" class="status-box">Noch keine Prüfung.</dd>
+      </dl>
+      <div class="metrics">
+        <div class="metric">
+          <span>Helligkeit</span>
+          <strong id="metric-brightness">–</strong>
+        </div>
+        <div class="metric">
+          <span>Frame-Diff</span>
+          <strong id="metric-diff">–</strong>
+        </div>
+        <div class="metric">
+          <span>Audio dBFS</span>
+          <strong id="metric-audio">–</strong>
+        </div>
+      </div>
+      <p class="hint metrics-hint">
+        Helligkeit ist der Mittelwert 0–255 (niedrig = Schwarzbild).
+        Frame-Diff ist die mittlere Pixeländerung zum vorherigen Frame (sehr niedrig = eingefrorenes Bild).
+        Audio dBFS ist der Lautstärkepegel (niedriger = Stille).
+      </p>
+    </section>
 
-      <section class="card">
-        <div class="preview-head">
-          <h2>Vorschau</h2>
-          <span id="preview-label" class="preview-label">Kein Bild</span>
+    <section class="card span-all">
+      <div class="preview-head">
+        <h2>Verlauf</h2>
+        <div class="range-tabs" role="group" aria-label="Zeitfenster">
+          <button type="button" class="range-tab" data-minutes="30">30 Min</button>
+          <button type="button" class="range-tab is-active" data-minutes="120">2 Std</button>
+          <button type="button" class="range-tab" data-minutes="360">6 Std</button>
         </div>
-        <div class="preview-frame">
-          <img id="preview-image" alt="Aktuelles Stream-Bild" class="hidden">
-          <div id="preview-empty" class="preview-empty">Noch kein Frame empfangen</div>
-        </div>
-      </section>
-    </div>
+      </div>
+      <div id="chart-wrap" class="chart-wrap is-empty">
+        <canvas id="metrics-chart" aria-label="Verlauf von Helligkeit, Frame-Diff und Tonpegel"></canvas>
+        <p id="chart-empty" class="chart-empty">Noch keine Messwerte. Überwachung starten.</p>
+      </div>
+    </section>
 
     <section class="card span-all">
       <div class="preview-head">
@@ -151,6 +123,69 @@
     </section>
   </main>
 
+  <div id="settings-backdrop" class="drawer-backdrop" hidden></div>
+  <aside id="settings-drawer" class="drawer" role="dialog" aria-modal="true" aria-labelledby="settings-title" aria-hidden="true" inert>
+    <div class="drawer-head">
+      <h2 id="settings-title">Einstellungen</h2>
+      <button type="button" id="btn-close-settings" class="btn-icon btn-close" title="Einstellungen schließen" aria-label="Einstellungen schließen">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <form id="settings-form">
+      <div id="settings-fields" class="drawer-fields">
+        <label>
+          <span class="label">Stream-URL</span>
+          <input name="stream_url" type="text" placeholder="https://example.com/live/stream.m3u8">
+        </label>
+        <label>
+          <span class="label">Telegram Bot-Token</span>
+          <input name="telegram_bot_token" type="password" autocomplete="off">
+        </label>
+        <label>
+          <span class="label">Telegram Chat-ID</span>
+          <input name="telegram_chat_id" type="text">
+        </label>
+        <label>
+          <span class="label">Helligkeitsschwelle (Schwarzbild)</span>
+          <input name="brightness_threshold" type="number" min="0" max="255" step="0.5">
+          <span class="hint">Mittelwert 0–255. Darunter gilt das Bild als schwarz.</span>
+        </label>
+        <label>
+          <span class="label">Frame-Differenz (Freeze)</span>
+          <input name="freeze_threshold" type="number" min="0" step="0.01">
+          <span class="hint">Mittlere Pixeländerung. Darunter gilt das Bild als eingefroren.</span>
+        </label>
+        <label>
+          <span class="label">Audio (dBFS, Stille)</span>
+          <input name="audio_rms_threshold" type="number" min="-100" max="0" step="0.5">
+          <span class="hint">Lautstärkepegel. Darunter gilt der Ton als still.</span>
+        </label>
+        <label>
+          <span class="label">Prüfintervall (Sekunden)</span>
+          <input name="check_interval_seconds" type="number" min="3" max="600" step="1">
+        </label>
+        <label>
+          <span class="label">Cooldown nach Alarm (Sekunden)</span>
+          <input name="cooldown_seconds" type="number" min="0" max="86400" step="1">
+        </label>
+        <label class="check">
+          <input name="send_screenshot" type="checkbox">
+          Screenshot an Telegram senden
+        </label>
+      </div>
+      <div class="drawer-foot">
+        <p id="form-feedback" class="feedback"></p>
+        <div class="actions">
+          <button type="submit" class="btn btn-primary">Speichern</button>
+          <button type="button" id="btn-telegram" class="btn btn-ghost">Telegram testen</button>
+        </div>
+      </div>
+    </form>
+  </aside>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
   <script>
     const ALERT_LABELS = {
       black: "Schwarzbild",
@@ -161,10 +196,22 @@
 
     const form = document.getElementById("settings-form");
     const feedback = document.getElementById("form-feedback");
+    const settingsDrawer = document.getElementById("settings-drawer");
+    const settingsBackdrop = document.getElementById("settings-backdrop");
+    const btnOpenSettings = document.getElementById("btn-open-settings");
+    const btnCloseSettings = document.getElementById("btn-close-settings");
     const btnStart = document.getElementById("btn-start");
     const btnStop = document.getElementById("btn-stop");
     const btnTelegram = document.getElementById("btn-telegram");
     const btnClearAlerts = document.getElementById("btn-clear-alerts");
+    const chartWrap = document.getElementById("chart-wrap");
+    const chartEmpty = document.getElementById("chart-empty");
+
+    let lastSettings = null;
+    let metricMinutes = 120;
+    let metricSamples = [];
+    let lastSampleAt = "";
+    let metricsChart = null;
     const trashIcon =
       '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">' +
       '<path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 002 2h6a2 2 0 002-2l1-12M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2"/>' +
@@ -195,6 +242,13 @@
       };
     }
 
+    function setStreamUrl(url) {
+      const el = document.getElementById("status-stream");
+      const value = String(url || "").trim();
+      el.textContent = value || "–";
+      el.title = value;
+    }
+
     function fillSettings(s) {
       form.elements.stream_url.value = s.stream_url || "";
       form.elements.telegram_bot_token.value = s.telegram_bot_token || "";
@@ -205,7 +259,10 @@
       form.elements.check_interval_seconds.value = s.check_interval_seconds;
       form.elements.cooldown_seconds.value = s.cooldown_seconds;
       form.elements.send_screenshot.checked = !!s.send_screenshot;
+      lastSettings = s;
+      setStreamUrl(s.stream_url);
       setRunning(s.monitoring_enabled);
+      renderChart();
     }
 
     function setRunning(running) {
@@ -275,6 +332,7 @@
         empty.classList.remove("hidden");
         label.textContent = "Kein Bild";
       }
+      return status;
     }
 
     async function refreshAlerts() {
@@ -313,11 +371,14 @@
     form.addEventListener("submit", async function (event) {
       event.preventDefault();
       try {
-        await api("/api/settings", {
+        const saved = await api("/api/settings", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formPayload())
         });
+        lastSettings = saved;
+        setStreamUrl(saved.stream_url);
+        renderChart();
         setFeedback("Einstellungen gespeichert.", true);
       } catch (err) {
         setFeedback(err.message, false);
@@ -343,16 +404,20 @@
 
     btnStart.addEventListener("click", async function () {
       try {
-        await api("/api/settings", {
+        const saved = await api("/api/settings", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formPayload())
         });
+        lastSettings = saved;
+        setStreamUrl(saved.stream_url);
+        renderChart();
         const result = await api("/api/monitor/start", { method: "POST" });
         setRunning(true);
         setFeedback(result.message, true);
       } catch (err) {
         setFeedback(err.message, false);
+        setSettingsOpen(true);
       }
     });
 
@@ -363,6 +428,7 @@
         setFeedback(result.message, true);
       } catch (err) {
         setFeedback(err.message, false);
+        setSettingsOpen(true);
       }
     });
 
@@ -393,16 +459,242 @@
       }
     });
 
+    function parseUtcMs(value) {
+      if (!value) return NaN;
+      const raw = String(value);
+      const hasZone = /Z$|[+-]\d{2}:?\d{2}$/.test(raw);
+      const date = new Date(hasZone ? raw : raw + "Z");
+      return date.getTime();
+    }
+
+    function samplePoints(samples, key) {
+      return samples.map(function (sample) {
+        const y = sample[key];
+        return {
+          x: parseUtcMs(sample.recorded_at),
+          y: y === null || y === undefined ? null : y
+        };
+      }).filter(function (point) {
+        return Number.isFinite(point.x);
+      });
+    }
+
+    function thresholdLine(value) {
+      if (value === null || value === undefined) return [];
+      const now = Date.now();
+      return [
+        { x: now - metricMinutes * 60 * 1000, y: value },
+        { x: now, y: value }
+      ];
+    }
+
+    function lineDataset(label, color, yAxisID, dashed) {
+      return {
+        label: label,
+        data: [],
+        borderColor: color,
+        backgroundColor: "transparent",
+        borderWidth: dashed ? 1 : 2,
+        borderDash: dashed ? [6, 4] : [],
+        pointRadius: 0,
+        pointHitRadius: 8,
+        tension: 0.15,
+        spanGaps: false,
+        yAxisID: yAxisID
+      };
+    }
+
+    function ensureChart() {
+      if (metricsChart) return metricsChart;
+      if (typeof Chart === "undefined") return null;
+      const canvas = document.getElementById("metrics-chart");
+      metricsChart = new Chart(canvas, {
+        type: "line",
+        data: {
+          datasets: [
+            lineDataset("Helligkeit", "#22d3ee", "y", false),
+            lineDataset("Frame-Diff", "#fcd34d", "y1", false),
+            lineDataset("Audio dBFS", "#4ade80", "y2", false),
+            lineDataset("Schwelle Helligkeit", "rgba(34, 211, 238, 0.45)", "y", true),
+            lineDataset("Schwelle Frame-Diff", "rgba(252, 211, 77, 0.45)", "y1", true),
+            lineDataset("Schwelle Audio", "rgba(74, 222, 128, 0.45)", "y2", true)
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          interaction: { mode: "index", intersect: false },
+          plugins: {
+            legend: {
+              labels: {
+                color: "#a1a1aa",
+                boxWidth: 12,
+                filter: function (item) {
+                  return item.text.indexOf("Schwelle") !== 0;
+                }
+              }
+            },
+            tooltip: {
+              callbacks: {
+                title: function (items) {
+                  if (!items.length) return "";
+                  return new Date(items[0].parsed.x).toLocaleString("de-DE");
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              type: "linear",
+              ticks: {
+                color: "#71717a",
+                maxTicksLimit: 8,
+                callback: function (value) {
+                  return new Date(value).toLocaleTimeString("de-DE", {
+                    hour: "2-digit",
+                    minute: "2-digit"
+                  });
+                }
+              },
+              grid: { color: "rgba(39, 39, 42, 0.9)" }
+            },
+            y: {
+              min: 0,
+              max: 255,
+              position: "left",
+              title: { display: true, text: "Helligkeit", color: "#22d3ee", font: { size: 10 } },
+              ticks: { color: "#22d3ee", font: { size: 10 }, maxTicksLimit: 6 },
+              grid: { color: "rgba(39, 39, 42, 0.9)" }
+            },
+            y1: {
+              min: 0,
+              position: "right",
+              title: { display: true, text: "Diff", color: "#fcd34d", font: { size: 10 } },
+              ticks: { color: "#fcd34d", font: { size: 10 }, maxTicksLimit: 6 },
+              grid: { drawOnChartArea: false }
+            },
+            y2: {
+              min: -100,
+              max: 0,
+              position: "right",
+              title: { display: true, text: "dBFS", color: "#4ade80", font: { size: 10 } },
+              ticks: { color: "#4ade80", font: { size: 10 }, maxTicksLimit: 6 },
+              grid: { drawOnChartArea: false }
+            }
+          }
+        }
+      });
+      return metricsChart;
+    }
+
+    function renderChart() {
+      const chart = ensureChart();
+      const empty = !metricSamples.length;
+      chartWrap.classList.toggle("is-empty", empty);
+      chartEmpty.classList.toggle("hidden", !empty);
+      if (!chart) return;
+      const thresholds = lastSettings || {};
+      chart.data.datasets[0].data = samplePoints(metricSamples, "brightness");
+      chart.data.datasets[1].data = samplePoints(metricSamples, "frame_diff");
+      chart.data.datasets[2].data = samplePoints(metricSamples, "audio_rms");
+      chart.data.datasets[3].data = thresholdLine(thresholds.brightness_threshold);
+      chart.data.datasets[4].data = thresholdLine(thresholds.freeze_threshold);
+      chart.data.datasets[5].data = thresholdLine(thresholds.audio_rms_threshold);
+      const now = Date.now();
+      chart.options.scales.x.min = now - metricMinutes * 60 * 1000;
+      chart.options.scales.x.max = now;
+      chart.update("none");
+    }
+
+    function applySamples(samples) {
+      metricSamples = samples || [];
+      lastSampleAt = metricSamples.length ? metricSamples[metricSamples.length - 1].recorded_at : "";
+      renderChart();
+    }
+
+    function maybeAppendStatus(status) {
+      if (!status || !status.last_check_at) return;
+      if (status.last_check_at === lastSampleAt) return;
+      if (lastSampleAt && parseUtcMs(status.last_check_at) === parseUtcMs(lastSampleAt)) return;
+      metricSamples.push({
+        recorded_at: status.last_check_at,
+        brightness: status.brightness,
+        frame_diff: status.frame_diff,
+        audio_rms: status.audio_rms
+      });
+      const cutoff = Date.now() - metricMinutes * 60 * 1000;
+      metricSamples = metricSamples.filter(function (sample) {
+        return parseUtcMs(sample.recorded_at) >= cutoff;
+      });
+      lastSampleAt = status.last_check_at;
+      renderChart();
+    }
+
+    async function refreshMetrics() {
+      applySamples(await api("/api/metrics?minutes=" + metricMinutes));
+    }
+
+    function setSettingsOpen(open, options) {
+      const restoreFocus = !options || options.restoreFocus !== false;
+      settingsDrawer.classList.toggle("is-open", open);
+      settingsBackdrop.classList.toggle("is-open", open);
+      settingsBackdrop.hidden = !open;
+      document.body.classList.toggle("is-drawer-open", open);
+      btnOpenSettings.setAttribute("aria-expanded", open ? "true" : "false");
+      settingsDrawer.setAttribute("aria-hidden", open ? "false" : "true");
+      if (open) {
+        settingsDrawer.removeAttribute("inert");
+        btnCloseSettings.focus();
+      } else {
+        settingsDrawer.setAttribute("inert", "");
+        if (restoreFocus) {
+          btnOpenSettings.focus();
+        }
+      }
+    }
+
+    btnOpenSettings.addEventListener("click", function () {
+      setSettingsOpen(true);
+    });
+    btnCloseSettings.addEventListener("click", function () {
+      setSettingsOpen(false);
+    });
+    settingsBackdrop.addEventListener("click", function () {
+      setSettingsOpen(false);
+    });
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && settingsDrawer.classList.contains("is-open")) {
+        setSettingsOpen(false);
+      }
+    });
+
+    document.querySelectorAll("[data-minutes]").forEach(function (button) {
+      button.addEventListener("click", async function () {
+        metricMinutes = Number(button.getAttribute("data-minutes"));
+        document.querySelectorAll("[data-minutes]").forEach(function (other) {
+          other.classList.toggle("is-active", other === button);
+        });
+        try {
+          await refreshMetrics();
+        } catch (_err) {
+          /* Zeitfenster-Wechsel darf die Oberfläche nicht stören. */
+        }
+      });
+    });
+
     async function tick() {
       try {
-        await refreshStatus();
+        const status = await refreshStatus();
         await refreshAlerts();
+        maybeAppendStatus(status);
       } catch (_err) {
         /* Polling darf die Oberfläche nicht stören. */
       }
     }
 
     loadSettings()
+      .then(function () { return refreshMetrics(); })
       .then(tick)
       .catch(function (err) { setFeedback(err.message, false); });
     setInterval(tick, 3000);

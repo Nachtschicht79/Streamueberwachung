@@ -5,13 +5,13 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal, init_db
 from app.database import PREVIEW_PATH
-from app.models import Alert, CheckStatus, Settings
+from app.models import Alert, CheckStatus, MetricSample, Settings
 from monitor.detector import (
     ALERT_LABELS,
     ALERT_OFFLINE,
@@ -248,7 +248,8 @@ def _store_status(metrics: CheckMetrics, has_preview: bool, result: str) -> None
         if status is None:
             status = CheckStatus()
             db.add(status)
-        status.last_check_at = datetime.now(timezone.utc)
+        now = datetime.now(timezone.utc)
+        status.last_check_at = now
         status.result = result
         status.error_type = ",".join(metrics.issues)
         status.message = metrics.message
@@ -256,6 +257,18 @@ def _store_status(metrics: CheckMetrics, has_preview: bool, result: str) -> None
         status.frame_diff = metrics.frame_diff
         status.audio_rms = metrics.audio_rms
         status.has_preview = has_preview
+        db.add(
+            MetricSample(
+                recorded_at=now,
+                brightness=metrics.brightness,
+                frame_diff=metrics.frame_diff,
+                audio_rms=metrics.audio_rms,
+            )
+        )
+        cutoff = now - timedelta(hours=6)
+        db.query(MetricSample).filter(MetricSample.recorded_at < cutoff).delete(
+            synchronize_session=False
+        )
         db.commit()
     except Exception:
         db.rollback()
