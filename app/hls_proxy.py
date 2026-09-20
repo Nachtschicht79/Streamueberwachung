@@ -140,7 +140,7 @@ def proxy_hls(url: str, settings: Settings) -> Response:
     if not target:
         raise HTTPException(status_code=400, detail="Keine Stream-URL angegeben.")
     if not is_allowed_hls_url(target, settings):
-        raise HTTPException(status_code=403, detail="URL ist nicht als Master- oder Backup-Stream hinterlegt.")
+        raise HTTPException(status_code=403, detail="URL ist nicht als Webstream oder Makalu hinterlegt.")
 
     session = requests.Session()
     session.max_redirects = 5

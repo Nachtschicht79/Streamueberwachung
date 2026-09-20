@@ -32,6 +32,35 @@
     return Math.round(bps / 1000) + " kbit/s";
   }
 
+  function attrNumber(line, name) {
+    const match = String(line || "").match(new RegExp("(?:^|[:,])" + name + "=(\\d+)"));
+    if (!match) return NaN;
+    const value = Number(match[1]);
+    return Number.isFinite(value) ? value : NaN;
+  }
+
+  function averageBitrate(samples) {
+    if (!samples || !samples.length) return NaN;
+    let sum = 0;
+    for (let i = 0; i < samples.length; i += 1) sum += samples[i];
+    return sum / samples.length;
+  }
+
+  function currentStreamBitrate(hls) {
+    if (!hls || !hls.levels || !hls.levels.length) return NaN;
+    const candidates = [hls.currentLevel, hls.loadLevel, hls.nextLoadLevel];
+    for (let i = 0; i < candidates.length; i += 1) {
+      const idx = candidates[i];
+      if (typeof idx === "number" && idx >= 0 && hls.levels[idx] && hls.levels[idx].bitrate > 0) {
+        return hls.levels[idx].bitrate;
+      }
+    }
+    if (hls.levels.length === 1 && hls.levels[0].bitrate > 0) {
+      return hls.levels[0].bitrate;
+    }
+    return NaN;
+  }
+
   function formatLatency(seconds) {
     if (!Number.isFinite(seconds) || seconds < 0) return "–";
     if (seconds < 1) return Math.round(seconds * 1000) + " ms";
@@ -56,6 +85,7 @@
     let segments = 0;
     let variantUrl = "";
     let pendingVariant = false;
+    let bandwidth = NaN;
     for (let i = 0; i < lines.length; i += 1) {
       const line = lines[i].trim();
       if (!line) continue;
@@ -65,6 +95,11 @@
       } else if (line.startsWith("#EXT-X-STREAM-INF")) {
         isMaster = true;
         pendingVariant = true;
+        const peak = attrNumber(line, "BANDWIDTH");
+        const average = attrNumber(line, "AVERAGE-BANDWIDTH");
+        if (!Number.isFinite(bandwidth)) {
+          bandwidth = Number.isFinite(peak) ? peak : average;
+        }
       } else if (line === "#EXT-X-ENDLIST") {
         isLive = false;
       } else if (line.startsWith("#EXTINF")) {
@@ -79,7 +114,8 @@
       isLive: isLive,
       segments: segments,
       targetDuration: targetDuration,
-      variantUrl: variantUrl
+      variantUrl: variantUrl,
+      bandwidth: bandwidth
     };
   }
 
@@ -101,6 +137,8 @@
     this.playerTimer = 0;
     this.url = "";
     this.mediaPlaylistUrl = "";
+    this.playlistBitrate = NaN;
+    this.bitrateSamples = [];
     this.nativeLimited = false;
     this._onWaiting = this._onWaiting.bind(this);
     this._onPlaying = this._onPlaying.bind(this);
@@ -139,6 +177,8 @@
     this.playerError = "";
     this.engine = "";
     this.nativeLimited = false;
+    this.playlistBitrate = NaN;
+    this.bitrateSamples = [];
     this.renderManifest({
       ok: false,
       state: "–",
@@ -202,13 +242,20 @@
       $(this.root, "[data-player-resolution]"),
       width && height ? width + "\u00d7" + height : "–"
     );
-    let bandwidth = "–";
+    let bitrate = formatBitrate(this.playlistBitrate);
+    const measured = averageBitrate(this.bitrateSamples);
+    if (bitrate === "–") bitrate = formatBitrate(measured);
+    let download = "–";
     let liveLatency = "–";
     if (this.hls) {
-      bandwidth = formatBitrate(this.hls.bandwidthEstimate);
+      const fromLevel = currentStreamBitrate(this.hls);
+      if (Number.isFinite(fromLevel) && fromLevel > 0) bitrate = formatBitrate(fromLevel);
+      else if (bitrate === "–") bitrate = formatBitrate(measured);
+      download = formatBitrate(this.hls.bandwidthEstimate);
       if (typeof this.hls.latency === "number") liveLatency = formatLatency(this.hls.latency);
     }
-    setText($(this.root, "[data-player-bandwidth]"), bandwidth);
+    setText($(this.root, "[data-player-bitrate]"), bitrate);
+    setText($(this.root, "[data-player-download]"), download);
     setText($(this.root, "[data-player-live-latency]"), liveLatency);
     setText($(this.root, "[data-player-stalls]"), this.url ? String(this.stalls) : "–");
     setText($(this.root, "[data-player-fragments]"), this.engine === "hls.js" ? String(this.fragments) : this.url ? "0" : "–");
@@ -307,8 +354,17 @@
           this.mediaPlaylistUrl = data.details.url;
         }
       }.bind(this));
-      this.hls.on(window.Hls.Events.FRAG_LOADED, function () {
+      this.hls.on(window.Hls.Events.FRAG_LOADED, function (_event, data) {
         this.fragments += 1;
+        const frag = data && data.frag;
+        const stats = (data && data.stats) || (frag && frag.stats);
+        const duration = frag && frag.duration;
+        const bytes = stats && (stats.total || stats.loaded);
+        if (duration > 0 && bytes > 0) {
+          this.bitrateSamples.push((bytes * 8) / duration);
+          if (this.bitrateSamples.length > 5) this.bitrateSamples.shift();
+        }
+        this.renderPlayer();
       }.bind(this));
       this.hls.on(window.Hls.Events.ERROR, function (_event, data) {
         if (!data) return;
@@ -363,6 +419,10 @@
       }
       let text = await first.text();
       let info = parsePlaylist(text);
+      if (Number.isFinite(info.bandwidth) && info.bandwidth > 0) {
+        this.playlistBitrate = info.bandwidth;
+        this.renderPlayer();
+      }
       let kind = info.isMaster ? "master" : "media";
       if (info.isMaster && info.variantUrl) {
         const nextUrl = info.variantUrl.indexOf("/api/hls/proxy") === 0

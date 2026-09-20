@@ -191,6 +191,22 @@ input:focus {
   min-height: 42px;
 }
 
+.choice-group {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.choice-group legend {
+  padding: 0;
+}
+
+.choice-group .check {
+  min-height: 32px;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;
@@ -366,6 +382,58 @@ input:focus {
 
 .metrics-hint {
   margin: 10px 0 0;
+}
+
+.status-streams {
+  display: grid;
+  gap: 16px;
+  margin-top: 4px;
+}
+
+.status-streams.is-split {
+  grid-template-columns: 1fr;
+}
+
+.stream-status h3 {
+  margin: 0 0 8px;
+  font-size: 0.7rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--subtle);
+}
+
+.status-streams:not(.is-split) .stream-status h3 {
+  display: none;
+}
+
+.preview-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+.preview-grid.is-split {
+  grid-template-columns: 1fr;
+}
+
+.preview-pane-label {
+  display: block;
+  margin-top: 16px;
+  font-size: 0.75rem;
+  color: var(--subtle);
+}
+
+.preview-grid:not(.is-split) .preview-pane-label {
+  display: none;
+}
+
+.preview-pane .preview-frame {
+  margin-top: 8px;
+}
+
+.preview-grid:not(.is-split) .preview-pane .preview-frame {
+  margin-top: 16px;
 }
 
 .preview-head {

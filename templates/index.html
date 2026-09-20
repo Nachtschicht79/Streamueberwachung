@@ -44,9 +44,21 @@
         <h2>Vorschau</h2>
         <span id="preview-label" class="preview-label">Kein Bild</span>
       </div>
-      <div class="preview-frame">
-        <img id="preview-image" alt="Aktuelles Stream-Bild" class="hidden">
-        <div id="preview-empty" class="preview-empty">Noch kein Frame empfangen</div>
+      <div id="preview-grid" class="preview-grid">
+        <article class="preview-pane" data-preview="webstream">
+          <span class="preview-pane-label">Webstream</span>
+          <div class="preview-frame">
+            <img data-preview-image alt="Aktuelles Webstream-Bild" class="hidden">
+            <div data-preview-empty class="preview-empty">Noch kein Frame empfangen</div>
+          </div>
+        </article>
+        <article class="preview-pane hidden" data-preview="makalu" aria-hidden="true">
+          <span class="preview-pane-label">Makalu</span>
+          <div class="preview-frame">
+            <img data-preview-image alt="Aktuelles Makalu-Bild" class="hidden">
+            <div data-preview-empty class="preview-empty">Noch kein Frame empfangen</div>
+          </div>
+        </article>
       </div>
     </section>
 
@@ -58,33 +70,59 @@
           <dd id="status-running">Gestoppt</dd>
         </div>
         <div class="status-row">
-          <dt>Master</dt>
+          <dt>Webstream</dt>
           <dd id="status-stream" class="status-url" title="">–</dd>
         </div>
         <div class="status-row">
-          <dt>Backup</dt>
+          <dt>Makalu</dt>
           <dd id="status-backup" class="status-url" title="">–</dd>
+        </div>
+        <div class="status-row">
+          <dt>Überwacht</dt>
+          <dd id="status-target">Webstream</dd>
         </div>
         <div class="status-row">
           <dt>Letzte Prüfung (Ortszeit)</dt>
           <dd id="status-time">–</dd>
         </div>
-        <dt class="label">Ergebnis</dt>
-        <dd id="status-message" class="status-box">Noch keine Prüfung.</dd>
       </dl>
-      <div class="metrics">
-        <div class="metric">
-          <span>Helligkeit</span>
-          <strong id="metric-brightness">–</strong>
-        </div>
-        <div class="metric">
-          <span>Frame-Diff</span>
-          <strong id="metric-diff">–</strong>
-        </div>
-        <div class="metric">
-          <span>Audio dBFS</span>
-          <strong id="metric-audio">–</strong>
-        </div>
+      <div id="status-streams" class="status-streams">
+        <article class="stream-status" data-status-source="webstream">
+          <h3>Webstream</h3>
+          <p class="status-box" data-status-message>Noch keine Prüfung.</p>
+          <div class="metrics">
+            <div class="metric">
+              <span>Helligkeit</span>
+              <strong data-metric-brightness>–</strong>
+            </div>
+            <div class="metric">
+              <span>Frame-Diff</span>
+              <strong data-metric-diff>–</strong>
+            </div>
+            <div class="metric">
+              <span>Audio dBFS</span>
+              <strong data-metric-audio>–</strong>
+            </div>
+          </div>
+        </article>
+        <article class="stream-status hidden" data-status-source="makalu" aria-hidden="true">
+          <h3>Makalu</h3>
+          <p class="status-box" data-status-message>Noch keine Prüfung.</p>
+          <div class="metrics">
+            <div class="metric">
+              <span>Helligkeit</span>
+              <strong data-metric-brightness>–</strong>
+            </div>
+            <div class="metric">
+              <span>Frame-Diff</span>
+              <strong data-metric-diff>–</strong>
+            </div>
+            <div class="metric">
+              <span>Audio dBFS</span>
+              <strong data-metric-audio>–</strong>
+            </div>
+          </div>
+        </article>
       </div>
       <p class="hint metrics-hint">
         Helligkeit ist der Mittelwert 0–255 (niedrig = Schwarzbild).
@@ -124,6 +162,7 @@
           <thead>
             <tr>
               <th>Zeit (Ortszeit)</th>
+              <th>Stream</th>
               <th>Typ</th>
               <th>Meldung</th>
               <th class="actions-col"> </th>
@@ -131,7 +170,7 @@
           </thead>
           <tbody id="alert-body">
             <tr>
-              <td colspan="4" class="empty">Noch keine Alarme.</td>
+              <td colspan="5" class="empty">Noch keine Alarme.</td>
             </tr>
           </tbody>
         </table>
@@ -154,11 +193,11 @@
         <article class="live-pane" data-stream="master">
           <div class="live-video-wrap" data-player-wrap>
             <div class="live-video-bar">
-              <h3>Master</h3>
+              <h3>Webstream</h3>
               <button type="button" class="btn btn-ghost live-mute" data-mute>Ton an</button>
             </div>
             <video playsinline muted></video>
-            <div class="live-empty" data-empty>Keine Master-URL hinterlegt</div>
+            <div class="live-empty" data-empty>Keine Webstream-URL hinterlegt</div>
           </div>
           <section class="live-block">
             <h4>Manifest</h4>
@@ -201,8 +240,12 @@
                 <strong data-player-resolution>–</strong>
               </div>
               <div>
-                <span>Bandwidth</span>
-                <strong data-player-bandwidth>–</strong>
+                <span>Bitrate</span>
+                <strong data-player-bitrate>–</strong>
+              </div>
+              <div>
+                <span>Download</span>
+                <strong data-player-download>–</strong>
               </div>
               <div>
                 <span>Live-Latenz</span>
@@ -223,11 +266,11 @@
         <article class="live-pane" data-stream="backup">
           <div class="live-video-wrap" data-player-wrap>
             <div class="live-video-bar">
-              <h3>Backup</h3>
+              <h3>Makalu</h3>
               <button type="button" class="btn btn-ghost live-mute" data-mute>Ton an</button>
             </div>
             <video playsinline muted></video>
-            <div class="live-empty" data-empty>Keine Backup-URL hinterlegt</div>
+            <div class="live-empty" data-empty>Keine Makalu-URL hinterlegt</div>
           </div>
           <section class="live-block">
             <h4>Manifest</h4>
@@ -270,8 +313,12 @@
                 <strong data-player-resolution>–</strong>
               </div>
               <div>
-                <span>Bandwidth</span>
-                <strong data-player-bandwidth>–</strong>
+                <span>Bitrate</span>
+                <strong data-player-bitrate>–</strong>
+              </div>
+              <div>
+                <span>Download</span>
+                <strong data-player-download>–</strong>
               </div>
               <div>
                 <span>Live-Latenz</span>
@@ -306,13 +353,28 @@
     <form id="settings-form">
       <div id="settings-fields" class="drawer-fields">
         <label>
-          <span class="label">Master-Stream-URL</span>
+          <span class="label">Webstream-URL</span>
           <input name="stream_url" type="text" placeholder="https://example.com/live/stream.m3u8">
         </label>
         <label>
-          <span class="label">Backup-Stream-URL</span>
-          <input name="backup_stream_url" type="text" placeholder="https://example.com/live/backup.m3u8">
+          <span class="label">Makalu-URL</span>
+          <input name="backup_stream_url" type="text" placeholder="https://example.com/live/makalu.m3u8">
         </label>
+        <fieldset class="choice-group">
+          <legend class="label">Überwachen</legend>
+          <label class="check">
+            <input name="monitor_target" type="radio" value="webstream" checked>
+            Nur Webstream
+          </label>
+          <label class="check">
+            <input name="monitor_target" type="radio" value="makalu">
+            Nur Makalu
+          </label>
+          <label class="check">
+            <input name="monitor_target" type="radio" value="both">
+            Beide Streams
+          </label>
+        </fieldset>
         <label>
           <span class="label">Telegram Bot-Token</span>
           <input name="telegram_bot_token" type="password" autocomplete="off">
@@ -371,6 +433,15 @@
       silence: "Kein Ton",
       offline: "Stream-Ausfall"
     };
+    const SOURCE_LABELS = {
+      webstream: "Webstream",
+      makalu: "Makalu"
+    };
+    const MONITOR_LABELS = {
+      webstream: "Nur Webstream",
+      makalu: "Nur Makalu",
+      both: "Beide Streams"
+    };
 
     const form = document.getElementById("settings-form");
     const feedback = document.getElementById("form-feedback");
@@ -390,10 +461,11 @@
     let lastSettings = null;
     let metricMinutes = 120;
     let metricSamples = [];
-    let lastSampleAt = "";
+    let lastSampleAtBySource = {};
     let metricsChart = null;
     let chartZoomed = false;
     let suppressZoomEvents = false;
+    let chartMode = "";
     const trashIcon =
       '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">' +
       '<path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 002 2h6a2 2 0 002-2l1-12M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2"/>' +
@@ -421,8 +493,33 @@
         audio_rms_threshold: toNumber(data.get("audio_rms_threshold")),
         check_interval_seconds: toNumber(data.get("check_interval_seconds")),
         cooldown_seconds: toNumber(data.get("cooldown_seconds")),
-        send_screenshot: form.elements.send_screenshot.checked
+        send_screenshot: form.elements.send_screenshot.checked,
+        monitor_target: selectedMonitorTarget()
       };
+    }
+
+    function selectedMonitorTarget() {
+      const selected = form.querySelector('input[name="monitor_target"]:checked');
+      return (selected && selected.value) || "webstream";
+    }
+
+    function setMonitorTarget(value) {
+      const target = value || "webstream";
+      form.querySelectorAll('input[name="monitor_target"]').forEach(function (input) {
+        input.checked = input.value === target;
+      });
+    }
+
+    function visibleSources(status) {
+      if (status && status.streams && status.streams.length) {
+        return status.streams.map(function (item) { return item.source; });
+      }
+      const target = (status && status.monitor_target)
+        || (lastSettings && lastSettings.monitor_target)
+        || "webstream";
+      if (target === "makalu") return ["makalu"];
+      if (target === "both") return ["webstream", "makalu"];
+      return ["webstream"];
     }
 
     function setStreamUrls(master, backup) {
@@ -447,8 +544,10 @@
       form.elements.check_interval_seconds.value = s.check_interval_seconds;
       form.elements.cooldown_seconds.value = s.cooldown_seconds;
       form.elements.send_screenshot.checked = !!s.send_screenshot;
+      setMonitorTarget(s.monitor_target);
       lastSettings = s;
       setStreamUrls(s.stream_url, s.backup_stream_url);
+      document.getElementById("status-target").textContent = MONITOR_LABELS[s.monitor_target] || "Webstream";
       setRunning(s.monitoring_enabled);
       renderChart();
     }
@@ -495,30 +594,85 @@
       fillSettings(await api("/api/settings"));
     }
 
+    function formatMetricAudio(value) {
+      if (value === null || value === undefined) return "–";
+      return formatNum(value, 1) + " dBFS";
+    }
+
+    function streamStatusMap(status) {
+      const map = {};
+      (status.streams || []).forEach(function (item) {
+        map[item.source] = item;
+      });
+      return map;
+    }
+
+    function renderPreviewPane(pane, item) {
+      const img = pane.querySelector("[data-preview-image]");
+      const empty = pane.querySelector("[data-preview-empty]");
+      const hasPreview = !!(item && item.has_preview);
+      if (hasPreview) {
+        img.src = "/preview.jpg?source=" + encodeURIComponent(item.source) + "&t=" + Date.now();
+        img.classList.remove("hidden");
+        empty.classList.add("hidden");
+      } else {
+        img.classList.add("hidden");
+        empty.classList.remove("hidden");
+      }
+    }
+
+    function renderStreamStatus(node, item) {
+      node.querySelector("[data-status-message]").textContent =
+        (item && item.message) || "Noch keine Prüfung.";
+      node.querySelector("[data-metric-brightness]").textContent =
+        formatNum(item && item.brightness, 1);
+      node.querySelector("[data-metric-diff]").textContent =
+        formatNum(item && item.frame_diff, 2);
+      node.querySelector("[data-metric-audio]").textContent =
+        formatMetricAudio(item && item.audio_rms);
+    }
+
     async function refreshStatus() {
       const status = await api("/api/status");
       setRunning(status.monitoring_enabled);
       document.getElementById("status-time").textContent = formatTime(status.last_check_at);
-      document.getElementById("status-message").textContent = status.message || "Noch keine Prüfung.";
-      document.getElementById("metric-brightness").textContent = formatNum(status.brightness, 1);
-      document.getElementById("metric-diff").textContent = formatNum(status.frame_diff, 2);
-      document.getElementById("metric-audio").textContent =
-        status.audio_rms === null || status.audio_rms === undefined
-          ? "–"
-          : formatNum(status.audio_rms, 1) + " dBFS";
+      document.getElementById("status-target").textContent =
+        MONITOR_LABELS[status.monitor_target] || "Webstream";
 
-      const img = document.getElementById("preview-image");
-      const empty = document.getElementById("preview-empty");
+      const sources = visibleSources(status);
+      const bySource = streamStatusMap(status);
+      const previewGrid = document.getElementById("preview-grid");
+      previewGrid.classList.toggle("is-split", sources.length > 1);
+      document.querySelectorAll("[data-preview]").forEach(function (pane) {
+        const source = pane.getAttribute("data-preview");
+        const visible = sources.indexOf(source) !== -1;
+        pane.classList.toggle("hidden", !visible);
+        pane.setAttribute("aria-hidden", visible ? "false" : "true");
+        if (visible) {
+          renderPreviewPane(pane, bySource[source]);
+        }
+      });
+      document.querySelectorAll("[data-status-source]").forEach(function (node) {
+        const source = node.getAttribute("data-status-source");
+        const visible = sources.indexOf(source) !== -1;
+        node.classList.toggle("hidden", !visible);
+        node.setAttribute("aria-hidden", visible ? "false" : "true");
+        if (visible) {
+          renderStreamStatus(node, bySource[source]);
+        }
+      });
+      document.getElementById("status-streams").classList.toggle("is-split", sources.length > 1);
+
+      const withPreview = sources.filter(function (source) {
+        return bySource[source] && bySource[source].has_preview;
+      }).length;
       const label = document.getElementById("preview-label");
-      if (status.has_preview) {
-        img.src = "/preview.jpg?t=" + Date.now();
-        img.classList.remove("hidden");
-        empty.classList.add("hidden");
-        label.textContent = "Aktueller Frame";
-      } else {
-        img.classList.add("hidden");
-        empty.classList.remove("hidden");
+      if (!sources.length || withPreview === 0) {
         label.textContent = "Kein Bild";
+      } else if (sources.length > 1) {
+        label.textContent = withPreview + " / " + sources.length + " aktuell";
+      } else {
+        label.textContent = "Aktueller Frame";
       }
       return status;
     }
@@ -528,14 +682,16 @@
       const body = document.getElementById("alert-body");
       btnClearAlerts.disabled = !alerts.length;
       if (!alerts.length) {
-        body.innerHTML = '<tr><td colspan="4" class="empty">Noch keine Alarme.</td></tr>';
+        body.innerHTML = '<tr><td colspan="5" class="empty">Noch keine Alarme.</td></tr>';
         return;
       }
       body.innerHTML = alerts.map(function (alert) {
         const type = ALERT_LABELS[alert.alert_type] || alert.alert_type;
+        const source = SOURCE_LABELS[alert.source] || alert.source || "–";
         return (
           "<tr>" +
           '<td class="muted">' + formatTime(alert.created_at) + "</td>" +
+          "<td>" + escapeHtml(source) + "</td>" +
           '<td class="type">' + type + "</td>" +
           "<td>" + escapeHtml(alert.message) + "</td>" +
           '<td class="row-actions">' +
@@ -566,7 +722,10 @@
         });
         lastSettings = saved;
         setStreamUrls(saved.stream_url, saved.backup_stream_url);
+        document.getElementById("status-target").textContent =
+          MONITOR_LABELS[saved.monitor_target] || "Webstream";
         renderChart();
+        try { await refreshStatus(); } catch (_err) { /* Status folgt beim nächsten Poll. */ }
         if (window.LiveStreams && window.LiveStreams.isOpen()) {
           window.LiveStreams.open(saved);
         }
@@ -602,10 +761,13 @@
         });
         lastSettings = saved;
         setStreamUrls(saved.stream_url, saved.backup_stream_url);
+        document.getElementById("status-target").textContent =
+          MONITOR_LABELS[saved.monitor_target] || "Webstream";
         renderChart();
         const result = await api("/api/monitor/start", { method: "POST" });
         setRunning(true);
         setFeedback(result.message, true);
+        try { await refreshStatus(); } catch (_err) { /* Status folgt beim nächsten Poll. */ }
       } catch (err) {
         setFeedback(err.message, false);
         setSettingsOpen(true);
@@ -658,8 +820,25 @@
       return date.getTime();
     }
 
-    function samplePoints(samples, key) {
-      return samples.map(function (sample) {
+    function sampleSource(sample) {
+      return sample.source || "webstream";
+    }
+
+    function uniqueSampleSources(samples) {
+      const seen = [];
+      (samples || []).forEach(function (sample) {
+        const source = sampleSource(sample);
+        if (seen.indexOf(source) === -1) {
+          seen.push(source);
+        }
+      });
+      return seen;
+    }
+
+    function samplePoints(samples, key, source) {
+      return samples.filter(function (sample) {
+        return !source || sampleSource(sample) === source;
+      }).map(function (sample) {
         const y = sample[key];
         return {
           x: parseUtcMs(sample.recorded_at),
@@ -762,21 +941,44 @@
       };
     }
 
-    function ensureChart() {
-      if (metricsChart) return metricsChart;
+    function chartDatasets(dual) {
+      if (!dual) {
+        return [
+          lineDataset("Helligkeit", "#22d3ee", "y", false),
+          lineDataset("Frame-Diff", "#fcd34d", "y1", false),
+          lineDataset("Audio dBFS", "#4ade80", "y2", false),
+          lineDataset("Schwelle Helligkeit", "rgba(34, 211, 238, 0.45)", "y", true),
+          lineDataset("Schwelle Frame-Diff", "rgba(252, 211, 77, 0.45)", "y1", true),
+          lineDataset("Schwelle Audio", "rgba(74, 222, 128, 0.45)", "y2", true)
+        ];
+      }
+      return [
+        lineDataset("Helligkeit Webstream", "#22d3ee", "y", false),
+        lineDataset("Helligkeit Makalu", "#67e8f9", "y", true),
+        lineDataset("Frame-Diff Webstream", "#fcd34d", "y1", false),
+        lineDataset("Frame-Diff Makalu", "#fde68a", "y1", true),
+        lineDataset("Audio Webstream", "#4ade80", "y2", false),
+        lineDataset("Audio Makalu", "#86efac", "y2", true),
+        lineDataset("Schwelle Helligkeit", "rgba(34, 211, 238, 0.45)", "y", true),
+        lineDataset("Schwelle Frame-Diff", "rgba(252, 211, 77, 0.45)", "y1", true),
+        lineDataset("Schwelle Audio", "rgba(74, 222, 128, 0.45)", "y2", true)
+      ];
+    }
+
+    function ensureChart(dual) {
+      const mode = dual ? "dual" : "single";
+      if (metricsChart && chartMode === mode) return metricsChart;
+      if (metricsChart) {
+        metricsChart.destroy();
+        metricsChart = null;
+      }
       if (typeof Chart === "undefined") return null;
+      chartMode = mode;
       const canvas = document.getElementById("metrics-chart");
       metricsChart = new Chart(canvas, {
         type: "line",
         data: {
-          datasets: [
-            lineDataset("Helligkeit", "#22d3ee", "y", false),
-            lineDataset("Frame-Diff", "#fcd34d", "y1", false),
-            lineDataset("Audio dBFS", "#4ade80", "y2", false),
-            lineDataset("Schwelle Helligkeit", "rgba(34, 211, 238, 0.45)", "y", true),
-            lineDataset("Schwelle Frame-Diff", "rgba(252, 211, 77, 0.45)", "y1", true),
-            lineDataset("Schwelle Audio", "rgba(74, 222, 128, 0.45)", "y2", true)
-          ]
+          datasets: chartDatasets(dual)
         },
         options: {
           responsive: true,
@@ -881,7 +1083,9 @@
     }
 
     function renderChart() {
-      const chart = ensureChart();
+      const sources = uniqueSampleSources(metricSamples);
+      const dual = sources.length > 1;
+      const chart = ensureChart(dual);
       const empty = !metricSamples.length;
       chartWrap.classList.toggle("is-empty", empty);
       chartEmpty.classList.toggle("hidden", !empty);
@@ -891,36 +1095,68 @@
         applyTimeWindow(chart, now);
       }
       const thresholds = lastSettings || {};
-      chart.data.datasets[0].data = samplePoints(metricSamples, "brightness");
-      chart.data.datasets[1].data = samplePoints(metricSamples, "frame_diff");
-      chart.data.datasets[2].data = samplePoints(metricSamples, "audio_rms");
-      chart.data.datasets[3].data = thresholdLine(thresholds.brightness_threshold);
-      chart.data.datasets[4].data = thresholdLine(thresholds.freeze_threshold);
-      chart.data.datasets[5].data = thresholdLine(thresholds.audio_rms_threshold);
+      if (dual) {
+        chart.data.datasets[0].data = samplePoints(metricSamples, "brightness", "webstream");
+        chart.data.datasets[1].data = samplePoints(metricSamples, "brightness", "makalu");
+        chart.data.datasets[2].data = samplePoints(metricSamples, "frame_diff", "webstream");
+        chart.data.datasets[3].data = samplePoints(metricSamples, "frame_diff", "makalu");
+        chart.data.datasets[4].data = samplePoints(metricSamples, "audio_rms", "webstream");
+        chart.data.datasets[5].data = samplePoints(metricSamples, "audio_rms", "makalu");
+        chart.data.datasets[6].data = thresholdLine(thresholds.brightness_threshold);
+        chart.data.datasets[7].data = thresholdLine(thresholds.freeze_threshold);
+        chart.data.datasets[8].data = thresholdLine(thresholds.audio_rms_threshold);
+      } else {
+        const source = sources[0] || "webstream";
+        chart.data.datasets[0].data = samplePoints(metricSamples, "brightness", source);
+        chart.data.datasets[1].data = samplePoints(metricSamples, "frame_diff", source);
+        chart.data.datasets[2].data = samplePoints(metricSamples, "audio_rms", source);
+        chart.data.datasets[3].data = thresholdLine(thresholds.brightness_threshold);
+        chart.data.datasets[4].data = thresholdLine(thresholds.freeze_threshold);
+        chart.data.datasets[5].data = thresholdLine(thresholds.audio_rms_threshold);
+      }
       chart.update("none");
+    }
+
+    function rememberSampleTimes(samples) {
+      lastSampleAtBySource = {};
+      (samples || []).forEach(function (sample) {
+        lastSampleAtBySource[sampleSource(sample)] = sample.recorded_at;
+      });
     }
 
     function applySamples(samples) {
       metricSamples = samples || [];
-      lastSampleAt = metricSamples.length ? metricSamples[metricSamples.length - 1].recorded_at : "";
+      rememberSampleTimes(metricSamples);
       renderChart();
     }
 
     function maybeAppendStatus(status) {
-      if (!status || !status.last_check_at) return;
-      if (status.last_check_at === lastSampleAt) return;
-      if (lastSampleAt && parseUtcMs(status.last_check_at) === parseUtcMs(lastSampleAt)) return;
-      metricSamples.push({
-        recorded_at: status.last_check_at,
-        brightness: status.brightness,
-        frame_diff: status.frame_diff,
-        audio_rms: status.audio_rms
+      const items = (status && status.streams && status.streams.length)
+        ? status.streams
+        : (status && status.last_check_at ? [status] : []);
+      if (!items.length) return;
+      let changed = false;
+      items.forEach(function (item) {
+        if (!item.last_check_at) return;
+        const source = item.source || "webstream";
+        const previous = lastSampleAtBySource[source];
+        if (previous === item.last_check_at) return;
+        if (previous && parseUtcMs(item.last_check_at) === parseUtcMs(previous)) return;
+        metricSamples.push({
+          recorded_at: item.last_check_at,
+          source: source,
+          brightness: item.brightness,
+          frame_diff: item.frame_diff,
+          audio_rms: item.audio_rms
+        });
+        lastSampleAtBySource[source] = item.last_check_at;
+        changed = true;
       });
+      if (!changed) return;
       const cutoff = Date.now() - metricMinutes * 60 * 1000;
       metricSamples = metricSamples.filter(function (sample) {
         return parseUtcMs(sample.recorded_at) >= cutoff;
       });
-      lastSampleAt = status.last_check_at;
       renderChart();
     }
 

@@ -8,6 +8,7 @@ from sqlalchemy import Boolean, DateTime, Float, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
+from app.streams import SOURCE_WEBSTREAM
 
 
 def utcnow() -> datetime:
@@ -32,6 +33,7 @@ class Settings(Base):
     cooldown_seconds: Mapped[int] = mapped_column(Integer, default=120)
     send_screenshot: Mapped[bool] = mapped_column(Boolean, default=True)
     monitoring_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    monitor_target: Mapped[str] = mapped_column(String(32), default="webstream")
 
 
 class Alert(Base):
@@ -42,6 +44,7 @@ class Alert(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     alert_type: Mapped[str] = mapped_column(String(32))
+    source: Mapped[str] = mapped_column(String(32), default=SOURCE_WEBSTREAM)
     message: Mapped[str] = mapped_column(Text, default="")
 
 
@@ -53,17 +56,19 @@ class MetricSample(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    source: Mapped[str] = mapped_column(String(32), default=SOURCE_WEBSTREAM)
     brightness: Mapped[float | None] = mapped_column(Float, nullable=True)
     frame_diff: Mapped[float | None] = mapped_column(Float, nullable=True)
     audio_rms: Mapped[float | None] = mapped_column(Float, nullable=True)
 
 
 class CheckStatus(Base):
-    """Letztes Prüfergebnis des Workers (eine Zeile)."""
+    """Letztes Prüfergebnis des Workers (eine Zeile pro Stream-Quelle)."""
 
     __tablename__ = "check_status"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source: Mapped[str] = mapped_column(String(32), default=SOURCE_WEBSTREAM)
     last_check_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     result: Mapped[str] = mapped_column(String(32), default="idle")
     error_type: Mapped[str] = mapped_column(String(128), default="")

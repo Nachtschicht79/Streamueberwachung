@@ -4,14 +4,20 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
-from app.database import SessionLocal, init_db
-from app.database import PREVIEW_PATH
+from app.database import SessionLocal, init_db, preview_path_for
 from app.models import Alert, CheckStatus, MetricSample, Settings
+from app.streams import (
+    SOURCE_MAKALU,
+    SOURCE_WEBSTREAM,
+    normalize_monitor_target,
+    selected_sources,
+    source_label,
+)
 from monitor.detector import (
     ALERT_LABELS,
     ALERT_OFFLINE,
@@ -34,6 +40,7 @@ class MonitorConfig:
     """Snapshot der Settings, damit der Stream-Check die DB nicht lange blockiert."""
 
     stream_url: str
+    backup_stream_url: str
     telegram_bot_token: str
     telegram_chat_id: str
     brightness_threshold: float
@@ -43,6 +50,30 @@ class MonitorConfig:
     cooldown_seconds: int
     send_screenshot: bool
     monitoring_enabled: bool
+    monitor_target: str
+
+
+@dataclass
+class StreamRuntime:
+    """Laufzeitstatus eines einzelnen überwachten Streams."""
+
+    source: str
+    capture: StreamCapture
+    previous_gray: object | None = None
+    consecutive: dict[str, int] = field(default_factory=dict)
+    last_url: str = ""
+    last_alert_at: dict[str, float] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not self.consecutive:
+            self.consecutive = {key: 0 for key in ALERT_TYPES}
+
+    def reset(self) -> None:
+        self.capture.release()
+        self.previous_gray = None
+        self.consecutive = {key: 0 for key in ALERT_TYPES}
+        self.last_url = ""
+        self.last_alert_at = {}
 
 
 def run_worker() -> None:
@@ -54,11 +85,10 @@ def run_worker() -> None:
     init_db()
     logger.info("Monitor-Worker gestartet.")
 
-    capture = StreamCapture()
-    previous_gray = None
-    last_url = ""
-    consecutive: dict[str, int] = {key: 0 for key in ALERT_TYPES}
-    last_alert_at: dict[str, float] = {}
+    runtimes = {
+        SOURCE_WEBSTREAM: StreamRuntime(source=SOURCE_WEBSTREAM, capture=StreamCapture()),
+        SOURCE_MAKALU: StreamRuntime(source=SOURCE_MAKALU, capture=StreamCapture()),
+    }
     was_enabled = False
 
     while True:
@@ -71,9 +101,8 @@ def run_worker() -> None:
 
             if not config.monitoring_enabled:
                 if was_enabled:
-                    capture.release()
-                    previous_gray = None
-                    consecutive = {key: 0 for key in ALERT_TYPES}
+                    for runtime in runtimes.values():
+                        runtime.reset()
                     _mark_idle()
                     logger.info("Überwachung gestoppt.")
                 was_enabled = False
@@ -82,27 +111,37 @@ def run_worker() -> None:
 
             was_enabled = True
             interval = float(max(3, config.check_interval_seconds))
+            active_sources = _active_sources(config)
+            for source, runtime in runtimes.items():
+                if source not in active_sources and runtime.last_url:
+                    runtime.reset()
 
-            if config.stream_url != last_url:
-                capture.release()
-                previous_gray = None
-                consecutive = {key: 0 for key in ALERT_TYPES}
-                last_url = config.stream_url
-
-            previous_gray, consecutive = _run_check(
-                config=config,
-                capture=capture,
-                previous_gray=previous_gray,
-                consecutive=consecutive,
-                last_alert_at=last_alert_at,
-            )
+            for source in active_sources:
+                url = _url_for(config, source)
+                runtime = runtimes[source]
+                try:
+                    if url != runtime.last_url:
+                        runtime.reset()
+                        runtime.last_url = url
+                    runtime.previous_gray, runtime.consecutive = _run_check(
+                        config=config,
+                        runtime=runtime,
+                        url=url,
+                    )
+                except Exception:
+                    logger.exception("Prüfung fehlgeschlagen (%s).", source_label(source))
+                    try:
+                        runtime.capture.release()
+                    except Exception:
+                        pass
+                    runtime.previous_gray = None
         except Exception:
             logger.exception("Unerwarteter Worker-Fehler")
-            try:
-                capture.release()
-            except Exception:
-                pass
-            previous_gray = None
+            for runtime in runtimes.values():
+                try:
+                    runtime.reset()
+                except Exception:
+                    pass
 
         _interruptible_sleep(interval)
 
@@ -115,6 +154,7 @@ def _load_config() -> MonitorConfig | None:
             return None
         return MonitorConfig(
             stream_url=settings.stream_url or "",
+            backup_stream_url=getattr(settings, "backup_stream_url", "") or "",
             telegram_bot_token=settings.telegram_bot_token or "",
             telegram_chat_id=settings.telegram_chat_id or "",
             brightness_threshold=float(settings.brightness_threshold),
@@ -124,42 +164,53 @@ def _load_config() -> MonitorConfig | None:
             cooldown_seconds=int(settings.cooldown_seconds),
             send_screenshot=bool(settings.send_screenshot),
             monitoring_enabled=bool(settings.monitoring_enabled),
+            monitor_target=normalize_monitor_target(getattr(settings, "monitor_target", None)),
         )
     finally:
         db.close()
 
 
+def _url_for(config: MonitorConfig, source: str) -> str:
+    if source == SOURCE_MAKALU:
+        return config.backup_stream_url.strip()
+    return config.stream_url.strip()
+
+
+def _active_sources(config: MonitorConfig) -> list[str]:
+    return [source for source in selected_sources(config.monitor_target) if _url_for(config, source)]
+
+
 def _run_check(
     config: MonitorConfig,
-    capture: StreamCapture,
-    previous_gray,
-    consecutive: dict[str, int],
-    last_alert_at: dict[str, float],
+    runtime: StreamRuntime,
+    url: str,
 ) -> tuple[object, dict[str, int]]:
-    url = config.stream_url.strip()
-    has_preview = PREVIEW_PATH.is_file()
+    source = runtime.source
+    preview = preview_path_for(source)
+    has_preview = preview.is_file()
+    label = source_label(source)
 
     if not url:
-        metrics = CheckMetrics(issues=[], message="Keine Stream-URL gesetzt.")
-        _store_status(metrics, has_preview=has_preview, result="error")
-        return previous_gray, consecutive
+        metrics = CheckMetrics(issues=[], message=f"Keine {label}-URL gesetzt.")
+        _store_status(source, metrics, has_preview=has_preview, result="error")
+        return runtime.previous_gray, runtime.consecutive
 
-    frame = capture.get_frame(url)
+    frame = runtime.capture.get_frame(url)
     if frame is None:
-        consecutive[ALERT_OFFLINE] = consecutive.get(ALERT_OFFLINE, 0) + 1
+        runtime.consecutive[ALERT_OFFLINE] = runtime.consecutive.get(ALERT_OFFLINE, 0) + 1
         for key in ALERT_TYPES:
             if key != ALERT_OFFLINE:
-                consecutive[key] = 0
+                runtime.consecutive[key] = 0
         metrics = CheckMetrics(issues=[ALERT_OFFLINE])
         metrics.message = summarize(metrics)
-        _store_status(metrics, has_preview=has_preview, result="error")
-        _maybe_alert(config, [ALERT_OFFLINE], consecutive, last_alert_at, metrics.message)
-        return None, consecutive
+        _store_status(source, metrics, has_preview=has_preview, result="error")
+        _maybe_alert(config, source, [ALERT_OFFLINE], runtime, metrics.message, preview)
+        return None, runtime.consecutive
 
-    has_preview = save_preview(frame, PREVIEW_PATH) or has_preview
+    has_preview = save_preview(frame, preview) or has_preview
     metrics = analyze_video(
         frame,
-        previous_gray,
+        runtime.previous_gray,
         config.brightness_threshold,
         config.freeze_threshold,
     )
@@ -169,41 +220,42 @@ def _run_check(
 
     for key in ALERT_TYPES:
         if key in metrics.issues:
-            consecutive[key] = consecutive.get(key, 0) + 1
+            runtime.consecutive[key] = runtime.consecutive.get(key, 0) + 1
         else:
-            consecutive[key] = 0
+            runtime.consecutive[key] = 0
 
     result = "error" if metrics.issues else "ok"
-    _store_status(metrics, has_preview=has_preview, result=result)
-    _maybe_alert(config, metrics.issues, consecutive, last_alert_at, metrics.message)
-    return metrics.gray, consecutive
+    _store_status(source, metrics, has_preview=has_preview, result=result)
+    _maybe_alert(config, source, metrics.issues, runtime, metrics.message, preview)
+    return metrics.gray, runtime.consecutive
 
 
 def _maybe_alert(
     config: MonitorConfig,
+    source: str,
     issues: list[str],
-    consecutive: dict[str, int],
-    last_alert_at: dict[str, float],
+    runtime: StreamRuntime,
     status_message: str,
+    preview,
 ) -> None:
     """Sendet Telegram erst nach zwei gleichen Fehlern und respektiert den Cooldown."""
     now = time.monotonic()
     fired: list[str] = []
     for issue in issues:
-        if consecutive.get(issue, 0) < CONSECUTIVE_NEEDED:
+        if runtime.consecutive.get(issue, 0) < CONSECUTIVE_NEEDED:
             continue
-        last = last_alert_at.get(issue, 0.0)
+        last = runtime.last_alert_at.get(issue, 0.0)
         if now - last < max(0, config.cooldown_seconds):
             continue
-        last_alert_at[issue] = now
+        runtime.last_alert_at[issue] = now
         fired.append(issue)
 
     if not fired:
         return
 
     labels = ", ".join(ALERT_LABELS.get(item, item) for item in fired)
-    text = f"Streamüberwachung: {labels}\n{status_message}"
-    _save_alerts(fired, text)
+    text = f"Streamüberwachung ({source_label(source)}): {labels}\n{status_message}"
+    _save_alerts(source, fired, text)
 
     token = config.telegram_bot_token.strip()
     chat_id = config.telegram_chat_id.strip()
@@ -211,18 +263,18 @@ def _maybe_alert(
         logger.info("Alarm gespeichert, Telegram nicht konfiguriert.")
         return
 
-    if config.send_screenshot and PREVIEW_PATH.is_file() and ALERT_OFFLINE not in fired:
-        ok, hint = send_photo(token, chat_id, PREVIEW_PATH, text)
+    if config.send_screenshot and preview.is_file() and ALERT_OFFLINE not in fired:
+        ok, hint = send_photo(token, chat_id, preview, text)
     else:
         ok, hint = send_message(token, chat_id, text)
 
     if ok:
-        logger.info("Telegram-Alarm gesendet (%s).", labels)
+        logger.info("Telegram-Alarm gesendet (%s, %s).", source_label(source), labels)
     else:
         logger.warning("Telegram-Versand fehlgeschlagen: %s", hint)
 
 
-def _save_alerts(types: list[str], message: str) -> None:
+def _save_alerts(source: str, types: list[str], message: str) -> None:
     db = SessionLocal()
     try:
         for alert_type in types:
@@ -230,6 +282,7 @@ def _save_alerts(types: list[str], message: str) -> None:
                 Alert(
                     created_at=datetime.now(timezone.utc),
                     alert_type=alert_type,
+                    source=source,
                     message=message,
                 )
             )
@@ -241,12 +294,12 @@ def _save_alerts(types: list[str], message: str) -> None:
         db.close()
 
 
-def _store_status(metrics: CheckMetrics, has_preview: bool, result: str) -> None:
+def _store_status(source: str, metrics: CheckMetrics, has_preview: bool, result: str) -> None:
     db = SessionLocal()
     try:
-        status = db.query(CheckStatus).first()
+        status = db.query(CheckStatus).filter(CheckStatus.source == source).first()
         if status is None:
-            status = CheckStatus()
+            status = CheckStatus(source=source)
             db.add(status)
         now = datetime.now(timezone.utc)
         status.last_check_at = now
@@ -260,6 +313,7 @@ def _store_status(metrics: CheckMetrics, has_preview: bool, result: str) -> None
         db.add(
             MetricSample(
                 recorded_at=now,
+                source=source,
                 brightness=metrics.brightness,
                 frame_diff=metrics.frame_diff,
                 audio_rms=metrics.audio_rms,
@@ -280,12 +334,13 @@ def _store_status(metrics: CheckMetrics, has_preview: bool, result: str) -> None
 def _mark_idle() -> None:
     db = SessionLocal()
     try:
-        status = db.query(CheckStatus).first()
-        if status is None:
+        rows = db.query(CheckStatus).all()
+        if not rows:
             return
-        status.result = "idle"
-        if not status.last_check_at:
-            status.message = "Überwachung ist gestoppt."
+        for status in rows:
+            status.result = "idle"
+            if not status.last_check_at:
+                status.message = "Überwachung ist gestoppt."
         db.commit()
     except Exception:
         db.rollback()
