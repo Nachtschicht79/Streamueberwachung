@@ -542,6 +542,14 @@ td.type {
   margin-top: 0;
 }
 
+.chart-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .range-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -570,12 +578,27 @@ td.type {
   color: #67e8f9;
 }
 
+.chart-reset {
+  border-color: rgba(250, 204, 21, 0.35);
+  color: #fde68a;
+}
+
+.chart-reset:hover {
+  color: #fef3c7;
+}
+
+.chart-hint {
+  margin: 10px 0 0;
+  font-size: 0.75rem;
+}
+
 .chart-wrap {
   position: relative;
-  margin-top: 16px;
+  margin-top: 12px;
   height: 280px;
   max-width: 100%;
   overflow: hidden;
+  touch-action: none;
 }
 
 .chart-wrap canvas {
