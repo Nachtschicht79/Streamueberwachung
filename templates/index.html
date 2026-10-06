@@ -96,12 +96,18 @@
     <section class="card span-all">
       <div class="preview-head">
         <h2>Verlauf</h2>
-        <div class="range-tabs" role="group" aria-label="Zeitfenster">
-          <button type="button" class="range-tab" data-minutes="30">30 Min</button>
-          <button type="button" class="range-tab is-active" data-minutes="120">2 Std</button>
-          <button type="button" class="range-tab" data-minutes="360">6 Std</button>
+        <div class="chart-toolbar">
+          <div class="range-tabs" role="group" aria-label="Zeitfenster">
+            <button type="button" class="range-tab" data-minutes="5">5 Min</button>
+            <button type="button" class="range-tab" data-minutes="15">15 Min</button>
+            <button type="button" class="range-tab" data-minutes="30">30 Min</button>
+            <button type="button" class="range-tab is-active" data-minutes="120">2 Std</button>
+            <button type="button" class="range-tab" data-minutes="360">6 Std</button>
+          </div>
+          <button type="button" id="btn-chart-reset" class="range-tab chart-reset" hidden title="Zoom zurücksetzen">Zoom zurück</button>
         </div>
       </div>
+      <p class="hint chart-hint">Mausrad oder Pinch zum Zoomen, Ziehen für einen Ausschnitt. Doppelklick setzt den Zoom zurück.</p>
       <div id="chart-wrap" class="chart-wrap is-empty">
         <canvas id="metrics-chart" aria-label="Verlauf von Helligkeit, Frame-Diff und Tonpegel"></canvas>
         <p id="chart-empty" class="chart-empty">Noch keine Messwerte. Überwachung starten.</p>
@@ -354,6 +360,8 @@
   </aside>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.20/dist/hls.min.js"></script>
   <script src="/static/js/live-player.js"></script>
   <script>
@@ -377,12 +385,14 @@
     const btnClearAlerts = document.getElementById("btn-clear-alerts");
     const chartWrap = document.getElementById("chart-wrap");
     const chartEmpty = document.getElementById("chart-empty");
+    const btnChartReset = document.getElementById("btn-chart-reset");
 
     let lastSettings = null;
     let metricMinutes = 120;
     let metricSamples = [];
     let lastSampleAt = "";
     let metricsChart = null;
+    let chartZoomed = false;
     const trashIcon =
       '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">' +
       '<path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 002 2h6a2 2 0 002-2l1-12M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2"/>' +
@@ -661,11 +671,42 @@
 
     function thresholdLine(value) {
       if (value === null || value === undefined) return [];
-      const now = Date.now();
+      const range = visibleTimeRange();
       return [
-        { x: now - metricMinutes * 60 * 1000, y: value },
-        { x: now, y: value }
+        { x: range.min, y: value },
+        { x: range.max, y: value }
       ];
+    }
+
+    function windowStart(now) {
+      return now - metricMinutes * 60 * 1000;
+    }
+
+    function visibleTimeRange() {
+      const now = Date.now();
+      const fallbackMin = windowStart(now);
+      const chart = metricsChart;
+      if (chart && chart.options.scales.x.min != null && chart.options.scales.x.max != null) {
+        return {
+          min: chart.options.scales.x.min,
+          max: chart.options.scales.x.max
+        };
+      }
+      return { min: fallbackMin, max: now };
+    }
+
+    function setChartZoomed(zoomed) {
+      chartZoomed = !!zoomed;
+      btnChartReset.hidden = !chartZoomed;
+    }
+
+    function resetChartZoom() {
+      const chart = metricsChart;
+      if (chart && typeof chart.resetZoom === "function") {
+        chart.resetZoom("none");
+      }
+      setChartZoomed(false);
+      renderChart();
     }
 
     function lineDataset(label, color, yAxisID, dashed) {
@@ -722,6 +763,33 @@
                   return new Date(items[0].parsed.x).toLocaleString("de-DE");
                 }
               }
+            },
+            zoom: {
+              limits: {
+                x: { min: "original", max: "original", minRange: 60 * 1000 }
+              },
+              pan: {
+                enabled: true,
+                mode: "x",
+                modifierKey: "shift",
+                onPanComplete: function () {
+                  setChartZoomed(true);
+                }
+              },
+              zoom: {
+                wheel: { enabled: true, speed: 0.1 },
+                pinch: { enabled: true },
+                drag: {
+                  enabled: true,
+                  backgroundColor: "rgba(34, 211, 238, 0.12)",
+                  borderColor: "rgba(34, 211, 238, 0.45)",
+                  borderWidth: 1
+                },
+                mode: "x",
+                onZoomComplete: function () {
+                  setChartZoomed(true);
+                }
+              }
             }
           },
           scales: {
@@ -731,10 +799,12 @@
                 color: "#71717a",
                 maxTicksLimit: 8,
                 callback: function (value) {
-                  return new Date(value).toLocaleTimeString("de-DE", {
-                    hour: "2-digit",
-                    minute: "2-digit"
-                  });
+                  const scale = this;
+                  const span = (scale.max || 0) - (scale.min || 0);
+                  const opts = span <= 15 * 60 * 1000
+                    ? { hour: "2-digit", minute: "2-digit", second: "2-digit" }
+                    : { hour: "2-digit", minute: "2-digit" };
+                  return new Date(value).toLocaleTimeString("de-DE", opts);
                 }
               },
               grid: { color: "rgba(39, 39, 42, 0.9)" }
@@ -765,6 +835,11 @@
           }
         }
       });
+      canvas.addEventListener("dblclick", function () {
+        if (chartZoomed) {
+          resetChartZoom();
+        }
+      });
       return metricsChart;
     }
 
@@ -774,6 +849,11 @@
       chartWrap.classList.toggle("is-empty", empty);
       chartEmpty.classList.toggle("hidden", !empty);
       if (!chart) return;
+      const now = Date.now();
+      if (!chartZoomed) {
+        chart.options.scales.x.min = windowStart(now);
+        chart.options.scales.x.max = now;
+      }
       const thresholds = lastSettings || {};
       chart.data.datasets[0].data = samplePoints(metricSamples, "brightness");
       chart.data.datasets[1].data = samplePoints(metricSamples, "frame_diff");
@@ -781,9 +861,6 @@
       chart.data.datasets[3].data = thresholdLine(thresholds.brightness_threshold);
       chart.data.datasets[4].data = thresholdLine(thresholds.freeze_threshold);
       chart.data.datasets[5].data = thresholdLine(thresholds.audio_rms_threshold);
-      const now = Date.now();
-      chart.options.scales.x.min = now - metricMinutes * 60 * 1000;
-      chart.options.scales.x.max = now;
       chart.update("none");
     }
 
@@ -863,12 +940,20 @@
       }
     });
 
+    btnChartReset.addEventListener("click", function () {
+      resetChartZoom();
+    });
+
     document.querySelectorAll("[data-minutes]").forEach(function (button) {
       button.addEventListener("click", async function () {
         metricMinutes = Number(button.getAttribute("data-minutes"));
         document.querySelectorAll("[data-minutes]").forEach(function (other) {
           other.classList.toggle("is-active", other === button);
         });
+        setChartZoomed(false);
+        if (metricsChart && typeof metricsChart.resetZoom === "function") {
+          metricsChart.resetZoom("none");
+        }
         try {
           await refreshMetrics();
         } catch (_err) {

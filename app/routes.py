@@ -143,7 +143,7 @@ def get_status(db: Session = Depends(get_db)) -> StatusOut:
 
 @router.get("/api/metrics", response_model=list[MetricSampleOut])
 def list_metrics(
-    minutes: int = Query(default=120, ge=15, le=360),
+    minutes: int = Query(default=120, ge=5, le=360),
     db: Session = Depends(get_db),
 ) -> list[MetricSample]:
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=minutes)
