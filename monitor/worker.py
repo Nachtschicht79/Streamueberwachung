@@ -10,7 +10,15 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal, init_db, preview_path_for
-from app.models import Alert, CheckStatus, MetricSample, Settings
+from app.models import (
+    OUTAGE_BROADCAST,
+    OUTAGE_SILENCE,
+    Alert,
+    CheckStatus,
+    MetricSample,
+    Outage,
+    Settings,
+)
 from app.streams import (
     SOURCE_MAKALU,
     SOURCE_WEBSTREAM,
@@ -19,11 +27,16 @@ from app.streams import (
     source_label,
 )
 from monitor.detector import (
+    ALERT_BLACK,
+    ALERT_BROADCAST,
+    ALERT_FREEZE,
     ALERT_LABELS,
     ALERT_OFFLINE,
+    ALERT_SILENCE,
     CheckMetrics,
     analyze_video,
     apply_silence,
+    combination_met,
     summarize,
 )
 from monitor.stream import StreamCapture, measure_audio_rms, save_preview
@@ -46,6 +59,9 @@ class MonitorConfig:
     brightness_threshold: float
     freeze_threshold: float
     audio_rms_threshold: float
+    outage_black: bool
+    outage_freeze: bool
+    outage_silence: bool
     check_interval_seconds: int
     cooldown_seconds: int
     send_screenshot: bool
@@ -63,17 +79,27 @@ class StreamRuntime:
     consecutive: dict[str, int] = field(default_factory=dict)
     last_url: str = ""
     last_alert_at: dict[str, float] = field(default_factory=dict)
+    broadcast_streak: int = 0
+    broadcast_pending_since: datetime | None = None
+    broadcast_open: bool = False
+    silence_pending_since: datetime | None = None
+    silence_open: bool = False
 
     def __post_init__(self) -> None:
         if not self.consecutive:
-            self.consecutive = {key: 0 for key in ALERT_TYPES}
+            self.consecutive = _blank_consecutive()
 
     def reset(self) -> None:
         self.capture.release()
         self.previous_gray = None
-        self.consecutive = {key: 0 for key in ALERT_TYPES}
+        self.consecutive = _blank_consecutive()
         self.last_url = ""
         self.last_alert_at = {}
+        self.broadcast_streak = 0
+        self.broadcast_pending_since = None
+        self.broadcast_open = False
+        self.silence_pending_since = None
+        self.silence_open = False
 
 
 def run_worker() -> None:
@@ -112,6 +138,7 @@ def run_worker() -> None:
             was_enabled = True
             interval = float(max(3, config.check_interval_seconds))
             active_sources = _active_sources(config)
+            _close_inactive_outages(active_sources)
             for source, runtime in runtimes.items():
                 if source not in active_sources and runtime.last_url:
                     runtime.reset()
@@ -121,6 +148,8 @@ def run_worker() -> None:
                 runtime = runtimes[source]
                 try:
                     if url != runtime.last_url:
+                        if runtime.last_url:
+                            _close_open_outages(runtime.source)
                         runtime.reset()
                         runtime.last_url = url
                     runtime.previous_gray, runtime.consecutive = _run_check(
@@ -160,6 +189,9 @@ def _load_config() -> MonitorConfig | None:
             brightness_threshold=float(settings.brightness_threshold),
             freeze_threshold=float(settings.freeze_threshold),
             audio_rms_threshold=float(settings.audio_rms_threshold),
+            outage_black=bool(settings.outage_black),
+            outage_freeze=bool(settings.outage_freeze),
+            outage_silence=bool(settings.outage_silence),
             check_interval_seconds=int(settings.check_interval_seconds),
             cooldown_seconds=int(settings.cooldown_seconds),
             send_screenshot=bool(settings.send_screenshot),
@@ -197,14 +229,18 @@ def _run_check(
 
     frame = runtime.capture.get_frame(url)
     if frame is None:
+        now = datetime.now(timezone.utc)
         runtime.consecutive[ALERT_OFFLINE] = runtime.consecutive.get(ALERT_OFFLINE, 0) + 1
         for key in ALERT_TYPES:
             if key != ALERT_OFFLINE:
                 runtime.consecutive[key] = 0
         metrics = CheckMetrics(issues=[ALERT_OFFLINE])
         metrics.message = summarize(metrics)
+        runtime.consecutive[ALERT_BROADCAST] = 0
         _store_status(source, metrics, has_preview=has_preview, result="error")
         _maybe_alert(config, source, [ALERT_OFFLINE], runtime, metrics.message, preview)
+        _track_broadcast(runtime, active=True, now=now)
+        _pause_silence(runtime)
         return None, runtime.consecutive
 
     has_preview = save_preview(frame, preview) or has_preview
@@ -218,16 +254,57 @@ def _run_check(
     apply_silence(metrics, audio_rms, config.audio_rms_threshold)
     metrics.message = summarize(metrics, audio_note=audio_note)
 
+    now = datetime.now(timezone.utc)
     for key in ALERT_TYPES:
+        if key == ALERT_SILENCE:
+            continue
         if key in metrics.issues:
             runtime.consecutive[key] = runtime.consecutive.get(key, 0) + 1
         else:
             runtime.consecutive[key] = 0
 
+    combination = combination_met(metrics.issues, _selected_criteria(config))
+    if combination:
+        runtime.consecutive[ALERT_BROADCAST] = runtime.consecutive.get(ALERT_BROADCAST, 0) + 1
+    else:
+        runtime.consecutive[ALERT_BROADCAST] = 0
+    _track_broadcast(runtime, active=combination or ALERT_OFFLINE in metrics.issues, now=now)
+    if audio_rms is not None:
+        if ALERT_SILENCE in metrics.issues:
+            runtime.consecutive[ALERT_SILENCE] = runtime.consecutive.get(ALERT_SILENCE, 0) + 1
+        else:
+            runtime.consecutive[ALERT_SILENCE] = 0
+        _track_silence(runtime, active=ALERT_SILENCE in metrics.issues, now=now)
+
     result = "error" if metrics.issues else "ok"
     _store_status(source, metrics, has_preview=has_preview, result=result)
-    _maybe_alert(config, source, metrics.issues, runtime, metrics.message, preview)
+    _maybe_alert(
+        config,
+        source,
+        [ALERT_BROADCAST] if combination else [],
+        runtime,
+        metrics.message,
+        preview,
+    )
     return metrics.gray, runtime.consecutive
+
+
+def _blank_consecutive() -> dict[str, int]:
+    counts = {key: 0 for key in ALERT_TYPES}
+    counts[ALERT_BROADCAST] = 0
+    return counts
+
+
+def _selected_criteria(config: MonitorConfig) -> set[str]:
+    """Kriterien, die gemeinsam einen Sendeausfall ergeben."""
+    selected: set[str] = set()
+    if config.outage_black:
+        selected.add(ALERT_BLACK)
+    if config.outage_freeze:
+        selected.add(ALERT_FREEZE)
+    if config.outage_silence:
+        selected.add(ALERT_SILENCE)
+    return selected
 
 
 def _maybe_alert(
@@ -331,7 +408,129 @@ def _store_status(source: str, metrics: CheckMetrics, has_preview: bool, result:
         db.close()
 
 
+def _track_broadcast(runtime: StreamRuntime, active: bool, now: datetime) -> None:
+    """Sendeausfall ab dem ersten Fehler, gespeichert nach zwei Prüfungen."""
+    if active:
+        if runtime.broadcast_pending_since is None:
+            runtime.broadcast_pending_since = now
+        runtime.broadcast_streak += 1
+        if not runtime.broadcast_open and runtime.broadcast_streak >= CONSECUTIVE_NEEDED:
+            started = runtime.broadcast_pending_since or now
+            if _open_outage(runtime.source, OUTAGE_BROADCAST, started):
+                runtime.broadcast_open = True
+        return
+    runtime.broadcast_streak = 0
+    runtime.broadcast_pending_since = None
+    runtime.broadcast_open = False
+    _close_outage(runtime.source, OUTAGE_BROADCAST, now)
+
+
+def _track_silence(runtime: StreamRuntime, active: bool, now: datetime) -> None:
+    """Stille unabhängig vom Sendeausfall, ebenfalls erst nach zwei Prüfungen."""
+    if active:
+        if runtime.silence_pending_since is None:
+            runtime.silence_pending_since = now
+        if not runtime.silence_open and runtime.consecutive.get(ALERT_SILENCE, 0) >= CONSECUTIVE_NEEDED:
+            started = runtime.silence_pending_since or now
+            if _open_outage(runtime.source, OUTAGE_SILENCE, started):
+                runtime.silence_open = True
+        return
+    runtime.silence_pending_since = None
+    runtime.silence_open = False
+    _close_outage(runtime.source, OUTAGE_SILENCE, now)
+
+
+def _pause_silence(runtime: StreamRuntime) -> None:
+    """Stream weg: Stille weder öffnen noch schließen. Unbestätigten Start verwerfen."""
+    if not runtime.silence_open:
+        runtime.silence_pending_since = None
+
+
+def _open_outage(source: str, kind: str, started_at: datetime) -> bool:
+    db = SessionLocal()
+    try:
+        existing = (
+            db.query(Outage)
+            .filter(Outage.source == source, Outage.kind == kind, Outage.ended_at.is_(None))
+            .first()
+        )
+        if existing is not None:
+            return True
+        db.add(Outage(source=source, kind=kind, started_at=started_at))
+        db.commit()
+        return True
+    except Exception:
+        db.rollback()
+        logger.exception("Ausfallzeitraum konnte nicht gespeichert werden.")
+        return False
+    finally:
+        db.close()
+
+
+def _close_outage(source: str, kind: str, ended_at: datetime) -> None:
+    db = SessionLocal()
+    try:
+        rows = (
+            db.query(Outage)
+            .filter(Outage.source == source, Outage.kind == kind, Outage.ended_at.is_(None))
+            .all()
+        )
+        if not rows:
+            return
+        for row in rows:
+            row.ended_at = ended_at
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("Ausfallzeitraum konnte nicht abgeschlossen werden.")
+    finally:
+        db.close()
+
+
+def _close_open_outages(source: str | None = None) -> None:
+    """Schließt offene Zeiträume. Ohne Quelle alle, sonst nur diese Quelle."""
+    db = SessionLocal()
+    try:
+        query = db.query(Outage).filter(Outage.ended_at.is_(None))
+        if source is not None:
+            query = query.filter(Outage.source == source)
+        rows = query.all()
+        if not rows:
+            return
+        now = datetime.now(timezone.utc)
+        for row in rows:
+            row.ended_at = now
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("Ausfallzeitraum konnte nicht abgeschlossen werden.")
+    finally:
+        db.close()
+
+
+def _close_inactive_outages(active_sources: list[str]) -> None:
+    """Beendet Zeiträume von Quellen, die gerade nicht überwacht werden."""
+    db = SessionLocal()
+    try:
+        query = db.query(Outage).filter(Outage.ended_at.is_(None))
+        if active_sources:
+            query = query.filter(Outage.source.notin_(active_sources))
+        rows = query.all()
+        if not rows:
+            return
+        now = datetime.now(timezone.utc)
+        for row in rows:
+            row.ended_at = now
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("Ausfallzeitraum konnte nicht abgeschlossen werden.")
+    finally:
+        db.close()
+
+
 def _mark_idle() -> None:
+    _close_open_outages()
     db = SessionLocal()
     try:
         rows = db.query(CheckStatus).all()

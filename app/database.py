@@ -106,6 +106,9 @@ def _ensure_schema_columns() -> None:
         [
             ("backup_stream_url", "VARCHAR(2048) DEFAULT ''"),
             ("monitor_target", "VARCHAR(32) DEFAULT 'webstream'"),
+            ("outage_black", "BOOLEAN DEFAULT 1"),
+            ("outage_freeze", "BOOLEAN DEFAULT 0"),
+            ("outage_silence", "BOOLEAN DEFAULT 1"),
         ],
     )
     _ensure_columns(
@@ -124,7 +127,7 @@ def _ensure_schema_columns() -> None:
 
 def init_db() -> None:
     """Legt Tabellen an und schreibt Default-Zeilen, falls noch keine existieren."""
-    from app.models import CheckStatus, MetricSample, Settings  # noqa: F401
+    from app.models import CheckStatus, MetricSample, Outage, Settings  # noqa: F401
 
     _ensure_data_dir()
     Base.metadata.create_all(bind=engine)

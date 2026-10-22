@@ -19,6 +19,10 @@
           <span class="dot"></span>
           Gestoppt
         </div>
+        <div id="signal-badge" class="badge" aria-live="polite">
+          <span class="dot"></span>
+          <span data-signal-badge-label>Keine Prüfung</span>
+        </div>
         <button type="button" id="btn-open-live" class="btn btn-ghost" aria-expanded="false" aria-controls="live-modal">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
@@ -46,14 +50,20 @@
       </div>
       <div id="preview-grid" class="preview-grid">
         <article class="preview-pane" data-preview="webstream">
-          <span class="preview-pane-label">Webstream</span>
+          <span class="preview-pane-label">
+            <span>Webstream</span>
+            <span class="preview-signal" data-preview-signal>Keine Prüfung</span>
+          </span>
           <div class="preview-frame">
             <img data-preview-image alt="Aktuelles Webstream-Bild" class="hidden">
             <div data-preview-empty class="preview-empty">Noch kein Frame empfangen</div>
           </div>
         </article>
         <article class="preview-pane hidden" data-preview="makalu" aria-hidden="true">
-          <span class="preview-pane-label">Makalu</span>
+          <span class="preview-pane-label">
+            <span>Makalu</span>
+            <span class="preview-signal" data-preview-signal>Keine Prüfung</span>
+          </span>
           <div class="preview-frame">
             <img data-preview-image alt="Aktuelles Makalu-Bild" class="hidden">
             <div data-preview-empty class="preview-empty">Noch kein Frame empfangen</div>
@@ -64,32 +74,52 @@
 
     <section class="card">
       <h2>Status</h2>
-      <dl>
+      <dl class="status-facts">
         <div class="status-row">
           <dt>Überwachung</dt>
           <dd id="status-running">Gestoppt</dd>
-        </div>
-        <div class="status-row">
-          <dt>Webstream</dt>
-          <dd id="status-stream" class="status-url" title="">–</dd>
-        </div>
-        <div class="status-row">
-          <dt>Makalu</dt>
-          <dd id="status-backup" class="status-url" title="">–</dd>
-        </div>
-        <div class="status-row">
-          <dt>Überwacht</dt>
-          <dd id="status-target">Webstream</dd>
         </div>
         <div class="status-row">
           <dt>Letzte Prüfung (Ortszeit)</dt>
           <dd id="status-time">–</dd>
         </div>
       </dl>
+      <div id="status-outage-banner" class="episode-banner is-outage" role="status" hidden>
+        <span class="dot"></span>
+        <span data-banner-text></span>
+      </div>
+      <dl id="status-outage-details" class="status-facts">
+        <div class="status-row">
+          <dt>Letzter Sendeausfall</dt>
+          <dd id="status-outage">–</dd>
+        </div>
+        <div class="status-row">
+          <dt>Dauer</dt>
+          <dd id="status-outage-duration">–</dd>
+        </div>
+      </dl>
+      <div id="status-silence-banner" class="episode-banner is-silence" role="status" hidden>
+        <span class="dot"></span>
+        <span data-banner-text></span>
+      </div>
+      <dl id="status-silence-details" class="status-facts">
+        <div class="status-row">
+          <dt>Letzte Stille</dt>
+          <dd id="status-silence">–</dd>
+        </div>
+        <div class="status-row">
+          <dt>Stilledauer</dt>
+          <dd id="status-silence-duration">–</dd>
+        </div>
+      </dl>
       <div id="status-streams" class="status-streams">
         <article class="stream-status" data-status-source="webstream">
           <h3>Webstream</h3>
-          <p class="status-box" data-status-message>Noch keine Prüfung.</p>
+          <p class="signal-line is-idle" data-signal-line>
+            <span class="dot"></span>
+            <strong data-signal-label>Keine Prüfung</strong>
+          </p>
+          <p class="status-box is-idle" data-status-message>Noch keine Prüfung.</p>
           <div class="metrics">
             <div class="metric">
               <span>Helligkeit</span>
@@ -107,7 +137,11 @@
         </article>
         <article class="stream-status hidden" data-status-source="makalu" aria-hidden="true">
           <h3>Makalu</h3>
-          <p class="status-box" data-status-message>Noch keine Prüfung.</p>
+          <p class="signal-line is-idle" data-signal-line>
+            <span class="dot"></span>
+            <strong data-signal-label>Keine Prüfung</strong>
+          </p>
+          <p class="status-box is-idle" data-status-message>Noch keine Prüfung.</p>
           <div class="metrics">
             <div class="metric">
               <span>Helligkeit</span>
@@ -124,11 +158,6 @@
           </div>
         </article>
       </div>
-      <p class="hint metrics-hint">
-        Helligkeit ist der Mittelwert 0–255 (niedrig = Schwarzbild).
-        Frame-Diff ist die mittlere Pixeländerung zum vorherigen Frame (sehr niedrig = eingefrorenes Bild).
-        Audio dBFS ist der Lautstärkepegel (niedriger = Stille).
-      </p>
     </section>
 
     <section class="card span-all">
@@ -398,6 +427,22 @@
           <input name="audio_rms_threshold" type="number" min="-100" max="0" step="0.5">
           <span class="hint">Lautstärkepegel. Darunter gilt der Ton als still.</span>
         </label>
+        <fieldset class="choice-group">
+          <legend class="label">Sendeausfall</legend>
+          <label class="check">
+            <input name="outage_black" type="checkbox" checked>
+            Schwarzbild
+          </label>
+          <label class="check">
+            <input name="outage_freeze" type="checkbox">
+            Freeze
+          </label>
+          <label class="check">
+            <input name="outage_silence" type="checkbox" checked>
+            Stille
+          </label>
+          <span class="hint">Alle angehakten Kriterien müssen gleichzeitig zutreffen. Ohne Auswahl zählt nur ein nicht erreichbarer Stream.</span>
+        </fieldset>
         <label>
           <span class="label">Prüfintervall (Sekunden)</span>
           <input name="check_interval_seconds" type="number" min="3" max="600" step="1">
@@ -431,17 +476,22 @@
       black: "Schwarzbild",
       freeze: "Eingefrorenes Bild",
       silence: "Kein Ton",
-      offline: "Stream-Ausfall"
+      offline: "Stream-Ausfall",
+      broadcast: "Sendeausfall"
     };
     const SOURCE_LABELS = {
       webstream: "Webstream",
       makalu: "Makalu"
     };
-    const MONITOR_LABELS = {
-      webstream: "Nur Webstream",
-      makalu: "Nur Makalu",
-      both: "Beide Streams"
+    const WATCH_CRITERIA = ["black", "freeze", "silence"];
+    const SIGNAL_LABELS = {
+      ok: "In Ordnung",
+      outage: "Sendeausfall",
+      silence: "Kein Ton",
+      watch: "Hinweis",
+      idle: "Keine Prüfung"
     };
+    const SIGNAL_CLASSES = ["is-ok", "is-outage", "is-silence", "is-watch", "is-idle"];
 
     const form = document.getElementById("settings-form");
     const feedback = document.getElementById("form-feedback");
@@ -491,6 +541,9 @@
         brightness_threshold: toNumber(data.get("brightness_threshold")),
         freeze_threshold: toNumber(data.get("freeze_threshold")),
         audio_rms_threshold: toNumber(data.get("audio_rms_threshold")),
+        outage_black: form.elements.outage_black.checked,
+        outage_freeze: form.elements.outage_freeze.checked,
+        outage_silence: form.elements.outage_silence.checked,
         check_interval_seconds: toNumber(data.get("check_interval_seconds")),
         cooldown_seconds: toNumber(data.get("cooldown_seconds")),
         send_screenshot: form.elements.send_screenshot.checked,
@@ -522,17 +575,6 @@
       return ["webstream"];
     }
 
-    function setStreamUrls(master, backup) {
-      const masterEl = document.getElementById("status-stream");
-      const backupEl = document.getElementById("status-backup");
-      const masterValue = String(master || "").trim();
-      const backupValue = String(backup || "").trim();
-      masterEl.textContent = masterValue || "–";
-      masterEl.title = masterValue;
-      backupEl.textContent = backupValue || "–";
-      backupEl.title = backupValue;
-    }
-
     function fillSettings(s) {
       form.elements.stream_url.value = s.stream_url || "";
       form.elements.backup_stream_url.value = s.backup_stream_url || "";
@@ -541,13 +583,14 @@
       form.elements.brightness_threshold.value = s.brightness_threshold;
       form.elements.freeze_threshold.value = s.freeze_threshold;
       form.elements.audio_rms_threshold.value = s.audio_rms_threshold;
+      form.elements.outage_black.checked = !!s.outage_black;
+      form.elements.outage_freeze.checked = !!s.outage_freeze;
+      form.elements.outage_silence.checked = !!s.outage_silence;
       form.elements.check_interval_seconds.value = s.check_interval_seconds;
       form.elements.cooldown_seconds.value = s.cooldown_seconds;
       form.elements.send_screenshot.checked = !!s.send_screenshot;
       setMonitorTarget(s.monitor_target);
       lastSettings = s;
-      setStreamUrls(s.stream_url, s.backup_stream_url);
-      document.getElementById("status-target").textContent = MONITOR_LABELS[s.monitor_target] || "Webstream";
       setRunning(s.monitoring_enabled);
       renderChart();
     }
@@ -565,13 +608,156 @@
         : '<span class="dot"></span> Gestoppt';
     }
 
-    function formatTime(value) {
-      if (!value) return "–";
+    function parseDate(value) {
+      if (!value) return null;
       const raw = String(value);
       const hasZone = /Z$|[+-]\d{2}:?\d{2}$/.test(raw);
       const date = new Date(hasZone ? raw : raw + "Z");
-      if (Number.isNaN(date.getTime())) return "–";
-      return date.toLocaleString("de-DE");
+      if (Number.isNaN(date.getTime())) return null;
+      return date;
+    }
+
+    function formatTime(value) {
+      const date = parseDate(value);
+      return date ? date.toLocaleString("de-DE") : "–";
+    }
+
+    function formatSince(value) {
+      const date = parseDate(value);
+      if (!date) return "–";
+      const now = new Date();
+      const sameDay = date.getFullYear() === now.getFullYear()
+        && date.getMonth() === now.getMonth()
+        && date.getDate() === now.getDate();
+      if (sameDay) {
+        return date.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+      }
+      return date.toLocaleString("de-DE", {
+        day: "2-digit",
+        month: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+    }
+
+    function formatDuration(seconds) {
+      const total = Math.max(0, Math.round(Number(seconds) || 0));
+      const hours = Math.floor(total / 3600);
+      const minutes = Math.floor((total % 3600) / 60);
+      const secs = total % 60;
+      if (hours > 0) {
+        return minutes > 0 ? hours + " Std " + minutes + " Min" : hours + " Std";
+      }
+      if (minutes > 0) {
+        return secs > 0 ? minutes + " Min " + secs + " s" : minutes + " Min";
+      }
+      return secs + " s";
+    }
+
+    function issueList(item) {
+      return String((item && item.error_type) || "")
+        .split(",")
+        .map(function (part) { return part.trim(); })
+        .filter(Boolean);
+    }
+
+    function selectedOutageCriteria() {
+      const settings = lastSettings || {};
+      const selected = [];
+      if (settings.outage_black !== false) selected.push("black");
+      if (settings.outage_freeze === true) selected.push("freeze");
+      if (settings.outage_silence !== false) selected.push("silence");
+      return selected;
+    }
+
+    function combinationMet(issues) {
+      const selected = selectedOutageCriteria();
+      if (!selected.length) return false;
+      return selected.every(function (item) { return issues.indexOf(item) !== -1; });
+    }
+
+    function watchLabel(item) {
+      const issues = issueList(item);
+      const names = WATCH_CRITERIA.filter(function (key) {
+        return issues.indexOf(key) !== -1;
+      }).map(function (key) { return ALERT_LABELS[key]; });
+      return names.join(", ") || SIGNAL_LABELS.watch;
+    }
+
+    function signalText(item, signal) {
+      if (signal === "watch") return watchLabel(item);
+      return SIGNAL_LABELS[signal] || SIGNAL_LABELS.idle;
+    }
+
+    function classifyStream(item) {
+      if (!item || !item.result || item.result === "idle") return "idle";
+      const issues = issueList(item);
+      if (issues.indexOf("offline") !== -1 || combinationMet(issues)) return "outage";
+      const hasPicture = issues.indexOf("black") !== -1 || issues.indexOf("freeze") !== -1;
+      if (issues.indexOf("silence") !== -1 && !hasPicture) return "silence";
+      if (hasPicture || issues.indexOf("silence") !== -1) return "watch";
+      if (item.result === "ok") return "ok";
+      if (item.result === "error") return "outage";
+      return "idle";
+    }
+
+    function worstSignal(signals) {
+      const rank = { outage: 4, watch: 3, silence: 2, idle: 1, ok: 0 };
+      if (!signals.length) return "idle";
+      return signals.reduce(function (worst, signal) {
+        return rank[signal] > rank[worst] ? signal : worst;
+      });
+    }
+
+    function setSignalClass(element, signal) {
+      SIGNAL_CLASSES.forEach(function (name) {
+        element.classList.toggle(name, name === "is-" + signal);
+      });
+    }
+
+    function setSignalBadge(signal, text) {
+      const badge = document.getElementById("signal-badge");
+      const state = SIGNAL_LABELS[signal] ? signal : "idle";
+      badge.className = "badge" + (state === "idle" ? "" : " is-" + state);
+      badge.querySelector("[data-signal-badge-label]").textContent = text || SIGNAL_LABELS[state];
+    }
+
+    function signalHeadline(signal, items) {
+      if (signal !== "watch") return SIGNAL_LABELS[signal] || SIGNAL_LABELS.idle;
+      const names = [];
+      items.forEach(function (item) {
+        if (classifyStream(item) !== "watch") return;
+        watchLabel(item).split(", ").forEach(function (name) {
+          if (name && names.indexOf(name) === -1) names.push(name);
+        });
+      });
+      return names.join(", ") || SIGNAL_LABELS.watch;
+    }
+
+    function renderEpisode(kind, episode, ongoingLabel) {
+      const valueEl = document.getElementById("status-" + kind);
+      const durationEl = document.getElementById("status-" + kind + "-duration");
+      const banner = document.getElementById("status-" + kind + "-banner");
+      const details = document.getElementById("status-" + kind + "-details");
+      const ongoing = !!(episode && episode.ongoing && episode.started_at);
+      banner.hidden = !ongoing;
+      details.hidden = ongoing;
+      if (ongoing) {
+        const source = SOURCE_LABELS[episode.source] || episode.source || "";
+        banner.querySelector("[data-banner-text]").textContent =
+          ongoingLabel + " seit " + formatSince(episode.started_at)
+          + (source ? " · " + source : "")
+          + " · " + formatDuration(episode.duration_seconds);
+        return;
+      }
+      if (!episode || !episode.started_at) {
+        valueEl.textContent = "–";
+        durationEl.textContent = "–";
+        return;
+      }
+      const source = SOURCE_LABELS[episode.source] || episode.source || "";
+      valueEl.textContent = formatTime(episode.started_at) + (source ? " · " + source : "");
+      durationEl.textContent = formatDuration(episode.duration_seconds);
     }
 
     function formatNum(value, digits) {
@@ -607,10 +793,13 @@
       return map;
     }
 
-    function renderPreviewPane(pane, item) {
+    function renderPreviewPane(pane, item, signal) {
       const img = pane.querySelector("[data-preview-image]");
       const empty = pane.querySelector("[data-preview-empty]");
+      const state = SIGNAL_LABELS[signal] ? signal : "idle";
       const hasPreview = !!(item && item.has_preview);
+      setSignalClass(pane, state);
+      pane.querySelector("[data-preview-signal]").textContent = signalText(item, state);
       if (hasPreview) {
         img.src = "/preview.jpg?source=" + encodeURIComponent(item.source) + "&t=" + Date.now();
         img.classList.remove("hidden");
@@ -621,9 +810,14 @@
       }
     }
 
-    function renderStreamStatus(node, item) {
-      node.querySelector("[data-status-message]").textContent =
-        (item && item.message) || "Noch keine Prüfung.";
+    function renderStreamStatus(node, item, signal) {
+      const state = SIGNAL_LABELS[signal] ? signal : classifyStream(item);
+      const line = node.querySelector("[data-signal-line]");
+      setSignalClass(line, state);
+      line.querySelector("[data-signal-label]").textContent = signalText(item, state);
+      const box = node.querySelector("[data-status-message]");
+      box.textContent = (item && item.message) || "Noch keine Prüfung.";
+      box.className = "status-box is-" + state;
       node.querySelector("[data-metric-brightness]").textContent =
         formatNum(item && item.brightness, 1);
       node.querySelector("[data-metric-diff]").textContent =
@@ -632,15 +826,37 @@
         formatMetricAudio(item && item.audio_rms);
     }
 
+    function updatePreviewLabel(signal, sources, withPreview, text) {
+      const label = document.getElementById("preview-label");
+      const state = SIGNAL_LABELS[signal] ? signal : "idle";
+      setSignalClass(label, state);
+      if (state === "outage" || state === "silence" || state === "ok" || state === "watch") {
+        label.textContent = text || SIGNAL_LABELS[state];
+        return;
+      }
+      setSignalClass(label, "idle");
+      if (!sources.length || withPreview === 0) {
+        label.textContent = "Kein Bild";
+        return;
+      }
+      if (sources.length > 1) {
+        label.textContent = withPreview + " / " + sources.length + " aktuell";
+        return;
+      }
+      label.textContent = "Aktueller Frame";
+    }
+
     async function refreshStatus() {
       const status = await api("/api/status");
       setRunning(status.monitoring_enabled);
       document.getElementById("status-time").textContent = formatTime(status.last_check_at);
-      document.getElementById("status-target").textContent =
-        MONITOR_LABELS[status.monitor_target] || "Webstream";
+      renderEpisode("outage", status.last_outage, "Sendeausfall");
+      renderEpisode("silence", status.last_silence, "Stille");
 
       const sources = visibleSources(status);
       const bySource = streamStatusMap(status);
+      const signals = [];
+      const visibleItems = [];
       const previewGrid = document.getElementById("preview-grid");
       previewGrid.classList.toggle("is-split", sources.length > 1);
       document.querySelectorAll("[data-preview]").forEach(function (pane) {
@@ -649,7 +865,10 @@
         pane.classList.toggle("hidden", !visible);
         pane.setAttribute("aria-hidden", visible ? "false" : "true");
         if (visible) {
-          renderPreviewPane(pane, bySource[source]);
+          const signal = classifyStream(bySource[source]);
+          signals.push(signal);
+          visibleItems.push(bySource[source]);
+          renderPreviewPane(pane, bySource[source], signal);
         }
       });
       document.querySelectorAll("[data-status-source]").forEach(function (node) {
@@ -658,22 +877,18 @@
         node.classList.toggle("hidden", !visible);
         node.setAttribute("aria-hidden", visible ? "false" : "true");
         if (visible) {
-          renderStreamStatus(node, bySource[source]);
+          renderStreamStatus(node, bySource[source], classifyStream(bySource[source]));
         }
       });
       document.getElementById("status-streams").classList.toggle("is-split", sources.length > 1);
 
+      const headline = worstSignal(signals);
+      const headlineText = signalHeadline(headline, visibleItems);
+      setSignalBadge(headline, headlineText);
       const withPreview = sources.filter(function (source) {
         return bySource[source] && bySource[source].has_preview;
       }).length;
-      const label = document.getElementById("preview-label");
-      if (!sources.length || withPreview === 0) {
-        label.textContent = "Kein Bild";
-      } else if (sources.length > 1) {
-        label.textContent = withPreview + " / " + sources.length + " aktuell";
-      } else {
-        label.textContent = "Aktueller Frame";
-      }
+      updatePreviewLabel(headline, sources, withPreview, headlineText);
       return status;
     }
 
@@ -721,9 +936,6 @@
           body: JSON.stringify(formPayload())
         });
         lastSettings = saved;
-        setStreamUrls(saved.stream_url, saved.backup_stream_url);
-        document.getElementById("status-target").textContent =
-          MONITOR_LABELS[saved.monitor_target] || "Webstream";
         renderChart();
         try { await refreshStatus(); } catch (_err) { /* Status folgt beim nächsten Poll. */ }
         if (window.LiveStreams && window.LiveStreams.isOpen()) {
@@ -760,9 +972,6 @@
           body: JSON.stringify(formPayload())
         });
         lastSettings = saved;
-        setStreamUrls(saved.stream_url, saved.backup_stream_url);
-        document.getElementById("status-target").textContent =
-          MONITOR_LABELS[saved.monitor_target] || "Webstream";
         renderChart();
         const result = await api("/api/monitor/start", { method: "POST" });
         setRunning(true);

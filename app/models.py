@@ -10,6 +10,9 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 from app.streams import SOURCE_WEBSTREAM
 
+OUTAGE_BROADCAST = "broadcast"
+OUTAGE_SILENCE = "silence"
+
 
 def utcnow() -> datetime:
     """Aktuelle UTC-Zeit mit Zeitzone (für SQLite-kompatible Defaults)."""
@@ -29,6 +32,9 @@ class Settings(Base):
     brightness_threshold: Mapped[float] = mapped_column(Float, default=18.0)
     freeze_threshold: Mapped[float] = mapped_column(Float, default=2.5)
     audio_rms_threshold: Mapped[float] = mapped_column(Float, default=-42.0)
+    outage_black: Mapped[bool] = mapped_column(Boolean, default=True)
+    outage_freeze: Mapped[bool] = mapped_column(Boolean, default=False)
+    outage_silence: Mapped[bool] = mapped_column(Boolean, default=True)
     check_interval_seconds: Mapped[int] = mapped_column(Integer, default=10)
     cooldown_seconds: Mapped[int] = mapped_column(Integer, default=120)
     send_screenshot: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -77,3 +83,16 @@ class CheckStatus(Base):
     frame_diff: Mapped[float | None] = mapped_column(Float, nullable=True)
     audio_rms: Mapped[float | None] = mapped_column(Float, nullable=True)
     has_preview: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class Outage(Base):
+    """Zusammenhängender Sendeausfall (broadcast) oder Stille-Zeitraum (silence)."""
+
+    __tablename__ = "outages"
+    __table_args__ = (Index("ix_outages_kind_ended_at", "kind", "ended_at"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source: Mapped[str] = mapped_column(String(32), default=SOURCE_WEBSTREAM)
+    kind: Mapped[str] = mapped_column(String(32))
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

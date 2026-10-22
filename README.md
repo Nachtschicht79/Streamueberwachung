@@ -1,6 +1,6 @@
 # Streamüberwachung
 
-Lokales Tool zur Überwachung eines Livestreams (HLS `.m3u8`, HTTP oder RTMP). Bei Schwarzbild, eingefrorenem Bild, Stille oder Stream-Ausfall wird eine Telegram-Nachricht gesendet. Steuerung und Konfiguration laufen über eine Weboberfläche unter [http://localhost:8000](http://localhost:8000).
+Lokales Tool zur Überwachung eines Livestreams (HLS `.m3u8`, HTTP oder RTMP). Eine Telegram-Nachricht geht raus, wenn der Stream nicht erreichbar ist oder alle in den Einstellungen angehakten Kriterien gleichzeitig zutreffen. Steuerung und Konfiguration laufen über eine Weboberfläche unter [http://localhost:8000](http://localhost:8000).
 
 ## Voraussetzungen
 
@@ -39,7 +39,9 @@ Damit starten Webserver und Monitor-Worker gemeinsam. Die Oberfläche ist unter 
 4. **Telegram testen** sendet eine Nachricht und zeigt Erfolg oder Fehler an.
 5. **Überwachung starten** / **stoppen**.
 
-Ein Alarm wird erst nach zwei aufeinanderfolgenden Fehlprüfungen desselben Typs gesendet. Danach gilt der eingestellte Cooldown.
+Unter **Sendeausfall** legt man fest, welche Kriterien zusammen gelten: Schwarzbild, Freeze und Stille. Startwert ist Schwarzbild und Stille, Freeze ist aus. Ein einzelnes Kriterium bleibt in der Oberfläche sichtbar, löst aber keine Nachricht aus, solange die Kombination nicht erfüllt ist. Ohne Auswahl zählt nur ein nicht erreichbarer Stream.
+
+Ein Alarm wird erst nach zwei aufeinanderfolgenden Treffern gesendet. Danach gilt der eingestellte Cooldown.
 
 ## Standard-Schwellen
 

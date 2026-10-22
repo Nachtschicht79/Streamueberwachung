@@ -30,6 +30,9 @@ class SettingsUpdate(BaseModel):
     brightness_threshold: float = Field(default=18.0, ge=0, le=255)
     freeze_threshold: float = Field(default=2.5, ge=0)
     audio_rms_threshold: float = Field(default=-42.0, ge=-100, le=0)
+    outage_black: bool = True
+    outage_freeze: bool = False
+    outage_silence: bool = True
     check_interval_seconds: int = Field(default=10, ge=3, le=600)
     cooldown_seconds: int = Field(default=120, ge=0, le=86400)
     send_screenshot: bool = True
@@ -74,6 +77,21 @@ class StreamStatusOut(BaseModel):
         return ensure_utc(value)
 
 
+class OutageOut(BaseModel):
+    """Letzter Sendeausfall oder letzte Stille für das Status-Panel."""
+
+    source: str
+    started_at: datetime
+    ended_at: datetime | None = None
+    duration_seconds: int
+    ongoing: bool
+
+    @field_validator("started_at", "ended_at", mode="before")
+    @classmethod
+    def outage_times_utc(cls, value: datetime | None) -> datetime | None:
+        return ensure_utc(value)
+
+
 class StatusOut(BaseModel):
     monitoring_enabled: bool
     monitor_target: str = "webstream"
@@ -86,6 +104,8 @@ class StatusOut(BaseModel):
     audio_rms: float | None
     has_preview: bool
     streams: list[StreamStatusOut] = Field(default_factory=list)
+    last_outage: OutageOut | None = None
+    last_silence: OutageOut | None = None
 
     @field_validator("last_check_at", mode="before")
     @classmethod

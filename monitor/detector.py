@@ -11,12 +11,14 @@ ALERT_BLACK = "black"
 ALERT_FREEZE = "freeze"
 ALERT_SILENCE = "silence"
 ALERT_OFFLINE = "offline"
+ALERT_BROADCAST = "broadcast"
 
 ALERT_LABELS: dict[str, str] = {
     ALERT_BLACK: "Schwarzbild",
     ALERT_FREEZE: "Eingefrorenes Bild",
     ALERT_SILENCE: "Kein Ton",
     ALERT_OFFLINE: "Stream-Ausfall",
+    ALERT_BROADCAST: "Sendeausfall",
 }
 
 # Kleinere Graustufen-Kopie für Freeze-Vergleich (stabiler und schneller).
@@ -79,6 +81,14 @@ def analyze_video(
             metrics.issues.append(ALERT_FREEZE)
 
     return metrics
+
+
+def combination_met(issues: list[str], selected: set[str]) -> bool:
+    """True, wenn jede gewählte Bedingung in derselben Prüfung zutrifft."""
+    if not selected:
+        return False
+    present = set(issues)
+    return selected <= present
 
 
 def apply_silence(metrics: CheckMetrics, audio_rms: float | None, audio_threshold: float) -> None:

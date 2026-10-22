@@ -11,10 +11,11 @@ from sqlalchemy.orm import Session
 
 from app.database import BASE_DIR, get_db, preview_path_for
 from app.hls_proxy import proxy_hls
-from app.models import Alert, CheckStatus, MetricSample, Settings
+from app.models import OUTAGE_BROADCAST, OUTAGE_SILENCE, Alert, CheckStatus, MetricSample, Outage, Settings
 from app.schemas import (
     AlertOut,
     MetricSampleOut,
+    OutageOut,
     SettingsOut,
     SettingsUpdate,
     SimpleOk,
@@ -22,6 +23,7 @@ from app.schemas import (
     StreamStatusOut,
     TelegramTestRequest,
     TelegramTestResponse,
+    ensure_utc,
 )
 from app.streams import (
     SOURCE_MAKALU,
@@ -47,6 +49,40 @@ def _settings_row(db: Session) -> Settings:
     return row
 
 
+def _latest_episode(db: Session, kind: str) -> OutageOut | None:
+    """Laufender Zeitraum hat Vorrang, sonst der zuletzt beendete."""
+    open_row = (
+        db.query(Outage)
+        .filter(Outage.kind == kind, Outage.ended_at.is_(None))
+        .order_by(Outage.started_at.desc(), Outage.id.desc())
+        .first()
+    )
+    row = open_row
+    if row is None:
+        row = (
+            db.query(Outage)
+            .filter(Outage.kind == kind, Outage.ended_at.isnot(None))
+            .order_by(Outage.ended_at.desc(), Outage.id.desc())
+            .first()
+        )
+    if row is None:
+        return None
+    started = ensure_utc(row.started_at)
+    if started is None:
+        return None
+    ended = ensure_utc(row.ended_at)
+    ongoing = ended is None
+    end_point = datetime.now(timezone.utc) if ongoing else ended
+    duration = max(0, int((end_point - started).total_seconds()))
+    return OutageOut(
+        source=row.source or SOURCE_WEBSTREAM,
+        started_at=started,
+        ended_at=ended,
+        duration_seconds=duration,
+        ongoing=ongoing,
+    )
+
+
 def _to_settings_out(row: Settings) -> SettingsOut:
     return SettingsOut(
         stream_url=row.stream_url,
@@ -56,6 +92,9 @@ def _to_settings_out(row: Settings) -> SettingsOut:
         brightness_threshold=row.brightness_threshold,
         freeze_threshold=row.freeze_threshold,
         audio_rms_threshold=row.audio_rms_threshold,
+        outage_black=bool(row.outage_black),
+        outage_freeze=bool(row.outage_freeze),
+        outage_silence=bool(row.outage_silence),
         check_interval_seconds=row.check_interval_seconds,
         cooldown_seconds=row.cooldown_seconds,
         send_screenshot=row.send_screenshot,
@@ -148,6 +187,9 @@ def save_settings(payload: SettingsUpdate, db: Session = Depends(get_db)) -> Set
     row.brightness_threshold = payload.brightness_threshold
     row.freeze_threshold = payload.freeze_threshold
     row.audio_rms_threshold = payload.audio_rms_threshold
+    row.outage_black = payload.outage_black
+    row.outage_freeze = payload.outage_freeze
+    row.outage_silence = payload.outage_silence
     row.check_interval_seconds = payload.check_interval_seconds
     row.cooldown_seconds = payload.cooldown_seconds
     row.send_screenshot = payload.send_screenshot
@@ -230,6 +272,8 @@ def get_status(db: Session = Depends(get_db)) -> StatusOut:
         audio_rms=headline.audio_rms if headline else None,
         has_preview=any(item.has_preview for item in streams),
         streams=streams,
+        last_outage=_latest_episode(db, OUTAGE_BROADCAST),
+        last_silence=_latest_episode(db, OUTAGE_SILENCE),
     )
 
 
